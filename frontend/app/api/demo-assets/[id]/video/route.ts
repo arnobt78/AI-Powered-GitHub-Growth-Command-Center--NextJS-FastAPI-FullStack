@@ -25,6 +25,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   return new Response(res.body, {
     status: res.status,
-    headers: { "Content-Type": "video/mp4" },
+    headers: { "Content-Type": res.headers.get("content-type") ?? "video/mp4" },
   });
 }

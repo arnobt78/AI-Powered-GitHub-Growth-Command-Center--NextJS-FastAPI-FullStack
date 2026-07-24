@@ -1,6 +1,6 @@
 "use client";
 
-import { Clapperboard } from "lucide-react";
+import { CheckCircle2, Clapperboard, Loader2, Play, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,11 +8,11 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { useDemoAssets, useTriggerDemoAsset } from "@/hooks/use-demo-assets";
 
-const STATUS_LABELS: Record<string, string> = {
-  generating: "Generating…",
-  ready: "Ready",
-  failed: "Failed",
-};
+const STATUS_META = {
+  generating: { icon: Loader2, color: "text-sky-500", label: "Generating…" },
+  ready: { icon: CheckCircle2, color: "text-emerald-500", label: "Ready" },
+  failed: { icon: XCircle, color: "text-red-500", label: "Failed" },
+} as const;
 
 export function DemoAssetsSection({ repoId }: { repoId: number }) {
   const { data: assets } = useDemoAssets(repoId);
@@ -28,6 +28,7 @@ export function DemoAssetsSection({ repoId }: { repoId: number }) {
           }
           disabled={trigger.isPending}
         >
+          <Play className="h-4 w-4" aria-hidden="true" />
           {trigger.isPending ? "Starting..." : "Generate"}
         </Button>
       </div>
@@ -36,24 +37,31 @@ export function DemoAssetsSection({ repoId }: { repoId: number }) {
         <EmptyState icon={Clapperboard} title="No demo videos yet" description="Click Generate to record a walkthrough." />
       ) : (
         <div className="space-y-2">
-          {assets?.map((asset) => (
-            <Card key={asset.id}>
-              <CardContent className="py-3">
-                <p className="text-sm font-medium">{STATUS_LABELS[asset.status] ?? asset.status}</p>
-                {asset.status === "failed" && asset.error_message && (
-                  <p className="mt-1 text-xs text-red-500">{asset.error_message}</p>
-                )}
-                {asset.status === "ready" && (
-                  <div className="mt-2 space-y-2">
-                    <video controls className="w-full max-w-md rounded-md" src={`/api/demo-assets/${asset.id}/video`} />
-                    <a href={`/api/demo-assets/${asset.id}/video`} download className="text-sm text-sky-500 hover:underline">
-                      Download
-                    </a>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+          {assets?.map((asset) => {
+            const meta = STATUS_META[asset.status as keyof typeof STATUS_META] ?? STATUS_META.generating;
+            const StatusIcon = meta.icon;
+            return (
+              <Card key={asset.id}>
+                <CardContent className="py-3">
+                  <p className="flex items-center gap-1.5 text-sm font-medium">
+                    <StatusIcon className={`h-4 w-4 ${meta.color}`} aria-hidden="true" />
+                    {meta.label}
+                  </p>
+                  {asset.status === "failed" && asset.error_message && (
+                    <p className="mt-1 text-xs text-red-500">{asset.error_message}</p>
+                  )}
+                  {asset.status === "ready" && (
+                    <div className="mt-2 space-y-2">
+                      <video controls className="w-full max-w-md rounded-md" src={`/api/demo-assets/${asset.id}/video`} />
+                      <a href={`/api/demo-assets/${asset.id}/video`} download className="text-sm text-sky-500 hover:underline">
+                        Download
+                      </a>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>
