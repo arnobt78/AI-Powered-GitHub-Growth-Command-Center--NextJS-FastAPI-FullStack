@@ -28,6 +28,7 @@ export default async function RepoDetailPage({ params }: { params: Promise<{ id:
     queryClient.prefetchQuery({ queryKey: queryKeys.repos.referrers(repoId), queryFn: () => api.listReferrers(repoId) }),
     queryClient.prefetchQuery({ queryKey: queryKeys.repos.popularPaths(repoId), queryFn: () => api.listPopularPaths(repoId) }),
     queryClient.prefetchQuery({ queryKey: queryKeys.recommendations.all, queryFn: () => api.listRecommendations() }),
+    queryClient.prefetchQuery({ queryKey: queryKeys.demoAssets.forRepo(repoId), queryFn: () => api.listDemoAssets(repoId) }),
   ]);
 
   return (

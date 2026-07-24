@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SectionHeading } from "@/components/ui/section-heading";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useDemoAssets, useTriggerDemoAsset } from "@/hooks/use-demo-assets";
 
 const STATUS_META = {
@@ -15,7 +16,7 @@ const STATUS_META = {
 } as const;
 
 export function DemoAssetsSection({ repoId }: { repoId: number }) {
-  const { data: assets } = useDemoAssets(repoId);
+  const { data: assets, isPending } = useDemoAssets(repoId);
   const trigger = useTriggerDemoAsset(repoId);
 
   return (
@@ -33,7 +34,9 @@ export function DemoAssetsSection({ repoId }: { repoId: number }) {
         </Button>
       </div>
 
-      {assets && assets.length === 0 ? (
+      {isPending ? (
+        <Skeleton className="h-24 w-full" />
+      ) : assets && assets.length === 0 ? (
         <EmptyState icon={Clapperboard} title="No demo videos yet" description="Click Generate to record a walkthrough." />
       ) : (
         <div className="space-y-2">

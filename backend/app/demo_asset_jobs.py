@@ -13,14 +13,20 @@ from app.video_compositor import VideoCompositor
 def generate_demo_asset(db: Session, demo_asset_id: int, urls: list[str]) -> None:
     settings = get_settings()
     asset = db.get(DemoAsset, demo_asset_id)
-    os.makedirs(settings.demo_assets_dir, exist_ok=True)
 
     try:
+        os.makedirs(settings.demo_assets_dir, exist_ok=True)
         raw_path = DemoRecorder().record(urls, output_dir=settings.demo_assets_dir)
-        mp4_filename = f"{demo_asset_id}.mp4"
-        mp4_path = os.path.join(settings.demo_assets_dir, mp4_filename)
-        VideoCompositor().to_mp4(raw_path, mp4_path)
-        os.remove(raw_path)
+        # The raw .webm must be removed whether compositing succeeds or
+        # fails — otherwise an ffmpeg failure leaks it forever, since the
+        # cleanup job only ever knows about video_path (never set on this
+        # path) and can't find it.
+        try:
+            mp4_filename = f"{demo_asset_id}.mp4"
+            mp4_path = os.path.join(settings.demo_assets_dir, mp4_filename)
+            VideoCompositor().to_mp4(raw_path, mp4_path)
+        finally:
+            os.remove(raw_path)
         asset.status = "ready"
         asset.video_path = mp4_filename
     except Exception as exc:

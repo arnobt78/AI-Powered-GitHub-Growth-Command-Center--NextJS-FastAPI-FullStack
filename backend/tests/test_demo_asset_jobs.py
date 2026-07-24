@@ -65,6 +65,52 @@ def test_generate_demo_asset_failure_marks_failed(mock_recorder_cls, mock_publis
     db.close()
 
 
+@patch("app.demo_asset_jobs.broadcaster.publish")
+@patch("app.demo_asset_jobs.os.remove")
+@patch("app.demo_asset_jobs.VideoCompositor")
+@patch("app.demo_asset_jobs.DemoRecorder")
+def test_generate_demo_asset_removes_raw_recording_even_when_compositing_fails(
+    mock_recorder_cls, mock_compositor_cls, mock_os_remove, mock_publish, seed_user
+):
+    _repo_id, asset_id = _seed_demo_asset(seed_user)
+
+    mock_recorder = MagicMock()
+    mock_recorder.record.return_value = "/tmp/demo_assets/raw.webm"
+    mock_recorder_cls.return_value = mock_recorder
+
+    mock_compositor = MagicMock()
+    mock_compositor.to_mp4.side_effect = RuntimeError("ffmpeg not found")
+    mock_compositor_cls.return_value = mock_compositor
+
+    db = SessionLocal()
+    generate_demo_asset(db, asset_id, urls=["https://example.com/repos/1"])
+
+    asset = db.get(DemoAsset, asset_id)
+    assert asset.status == "failed"
+    assert asset.error_message == "ffmpeg not found"
+    # The raw .webm must still be cleaned up even though compositing failed —
+    # otherwise it leaks forever (video_path is never set on this path, so
+    # the daily cleanup job has no way to find it).
+    mock_os_remove.assert_called_once_with("/tmp/demo_assets/raw.webm")
+    db.close()
+
+
+@patch("app.demo_asset_jobs.broadcaster.publish")
+@patch("app.demo_asset_jobs.os.makedirs")
+def test_generate_demo_asset_marks_failed_when_output_dir_cannot_be_created(mock_makedirs, mock_publish, seed_user):
+    _repo_id, asset_id = _seed_demo_asset(seed_user)
+    mock_makedirs.side_effect = PermissionError("Permission denied")
+
+    db = SessionLocal()
+    generate_demo_asset(db, asset_id, urls=["https://example.com/repos/1"])
+
+    asset = db.get(DemoAsset, asset_id)
+    assert asset.status == "failed"
+    assert asset.error_message == "Permission denied"
+    mock_publish.assert_called_once_with("demo_asset_updated", {"id": asset_id, "status": "failed"}, user_id=seed_user)
+    db.close()
+
+
 @patch("app.demo_asset_jobs.os.path.exists")
 @patch("app.demo_asset_jobs.os.remove")
 def test_cleanup_deletes_expired_assets_and_files(mock_os_remove, mock_os_exists, seed_user):
