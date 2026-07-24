@@ -3,6 +3,7 @@ import type {
   Benchmark,
   Draft,
   Insights,
+  Opportunity,
   PipelineRun,
   PopularPath,
   ProviderStatus,
@@ -32,6 +33,13 @@ export const api = {
   listRecommendations: () => backendFetch<Recommendation[]>("/recommendations"),
   dismissRecommendation: (id: number, dismissed: boolean) =>
     backendFetch<Recommendation>(`/recommendations/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ dismissed }),
+    }),
+
+  listOpportunities: () => backendFetch<Opportunity[]>("/opportunities"),
+  dismissOpportunity: (id: number, dismissed: boolean) =>
+    backendFetch<Opportunity>(`/opportunities/${id}`, {
       method: "PATCH",
       body: JSON.stringify({ dismissed }),
     }),

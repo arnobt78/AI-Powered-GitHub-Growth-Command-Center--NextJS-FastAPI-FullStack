@@ -14,3 +14,4 @@ export type RepoCreate = components["schemas"]["RepoCreate"];
 export type ProviderStatus = components["schemas"]["ProviderStatusOut"];
 export type UserUpsert = components["schemas"]["UserUpsert"];
 export type UserOut = components["schemas"]["UserOut"];
+export type Opportunity = components["schemas"]["OpportunityOut"];

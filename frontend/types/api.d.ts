@@ -159,6 +159,40 @@ export interface paths {
         patch: operations["update_recommendation_recommendations__recommendation_id__patch"];
         trace?: never;
     };
+    "/opportunities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Opportunities */
+        get: operations["list_opportunities_opportunities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/opportunities/{opportunity_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Opportunity */
+        patch: operations["update_opportunity_opportunities__opportunity_id__patch"];
+        trace?: never;
+    };
     "/drafts": {
         parameters: {
             query?: never;
@@ -222,6 +256,23 @@ export interface paths {
         put?: never;
         /** Trigger Content Run */
         post: operations["trigger_content_run_runs_content_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/runs/opportunities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Trigger Opportunities Run */
+        post: operations["trigger_opportunities_run_runs_opportunities_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -391,6 +442,31 @@ export interface components {
             latest_forks: number;
             /** Recommendation Count */
             recommendation_count: number;
+        };
+        /** OpportunityOut */
+        OpportunityOut: {
+            /** Id */
+            id: number;
+            /** Repo Id */
+            repo_id: number;
+            /** Source */
+            source: string;
+            /** Title */
+            title: string;
+            /** Url */
+            url: string;
+            /** Dismissed */
+            dismissed: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** OpportunityPatch */
+        OpportunityPatch: {
+            /** Dismissed */
+            dismissed: boolean;
         };
         /** PipelineRunOut */
         PipelineRunOut: {
@@ -972,6 +1048,76 @@ export interface operations {
             };
         };
     };
+    list_opportunities_opportunities_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-internal-user-token"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpportunityOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_opportunity_opportunities__opportunity_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-internal-user-token"?: string;
+            };
+            path: {
+                opportunity_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OpportunityPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpportunityOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_drafts_drafts_get: {
         parameters: {
             query?: never;
@@ -1107,6 +1253,38 @@ export interface operations {
         };
     };
     trigger_content_run_runs_content_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-internal-user-token"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TriggerRunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    trigger_opportunities_run_runs_opportunities_post: {
         parameters: {
             query?: never;
             header?: {

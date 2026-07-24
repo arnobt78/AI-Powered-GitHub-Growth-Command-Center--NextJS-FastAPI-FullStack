@@ -94,6 +94,39 @@ describe("useLiveEvents", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.runs.all });
   });
 
+  it("invalidates opportunities.all and runs.all when opportunities_generated arrives", () => {
+    const queryClient = new QueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <Harness />
+      </QueryClientProvider>,
+    );
+
+    const source = FakeEventSource.instances[0];
+    source.emit("opportunities_generated", {});
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.opportunities.all });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.runs.all });
+  });
+
+  it("invalidates opportunities.all when opportunity_updated arrives", () => {
+    const queryClient = new QueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <Harness />
+      </QueryClientProvider>,
+    );
+
+    const source = FakeEventSource.instances[0];
+    source.emit("opportunity_updated", { id: 1, dismissed: true });
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.opportunities.all });
+  });
+
   it("invalidates the users.me query when a user_updated event arrives", () => {
     const queryClient = new QueryClient();
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
