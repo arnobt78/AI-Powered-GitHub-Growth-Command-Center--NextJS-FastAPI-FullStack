@@ -28,6 +28,21 @@ def mock_transport():
                 {"tag_name": "v1.2.0", "body": "- Added dark mode\n- Fixed crash on startup", "published_at": "2026-07-20T00:00:00Z"},
                 {"tag_name": "v1.1.0", "body": "- Initial release", "published_at": "2026-06-01T00:00:00Z"},
             ])
+        if request.url.path == "/graphql" and request.method == "POST":
+            body = request.read()
+            import json as json_module
+            payload = json_module.loads(body)
+            if "hello-world" in payload["variables"]["searchQuery"]:
+                return httpx.Response(200, json={
+                    "data": {
+                        "search": {
+                            "nodes": [
+                                {"id": "D_kwABC123", "title": "hello-world usage question", "url": "https://github.com/someone/other/discussions/5"}
+                            ]
+                        }
+                    }
+                })
+            return httpx.Response(200, json={"data": {"search": {"nodes": []}}})
         return httpx.Response(404)
 
     return httpx.MockTransport(handler)
@@ -113,3 +128,25 @@ def test_list_releases_returns_empty_list_for_repo_with_no_releases():
     client = GitHubClient(token="fake-token", http_client=http)
 
     assert client.list_releases("octocat", "empty-repo") == []
+
+
+def test_search_discussions_returns_nodes(gh_client):
+    nodes = gh_client.search_discussions("hello-world")
+    assert nodes[0]["id"] == "D_kwABC123"
+    assert nodes[0]["title"] == "hello-world usage question"
+
+
+def test_search_discussions_returns_empty_list_when_no_matches(gh_client):
+    nodes = gh_client.search_discussions("no-such-repo-xyz")
+    assert nodes == []
+
+
+def test_search_discussions_raises_needs_reauth_on_401():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(401)
+
+    http = httpx.Client(base_url="https://api.github.com", transport=httpx.MockTransport(handler))
+    client = GitHubClient(token="fake-token", http_client=http)
+
+    with pytest.raises(GitHubAuthError):
+        client.search_discussions("hello-world")

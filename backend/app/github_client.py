@@ -79,3 +79,26 @@ class GitHubClient:
 
     def list_releases(self, owner: str, name: str, limit: int = 2) -> list[dict]:
         return self._get(f"/repos/{owner}/{name}/releases", params={"per_page": limit}).json()
+
+    def search_discussions(self, query: str, limit: int = 5) -> list[dict]:
+        graphql_query = """
+        query($searchQuery: String!, $limit: Int!) {
+          search(query: $searchQuery, type: DISCUSSION, first: $limit) {
+            nodes {
+              ... on Discussion {
+                id
+                title
+                url
+              }
+            }
+          }
+        }
+        """
+        resp = self._http.post(
+            "/graphql", json={"query": graphql_query, "variables": {"searchQuery": query, "limit": limit}}
+        )
+        if resp.status_code == 401:
+            raise GitHubAuthError(f"needs_reauth: GitHub token rejected for GraphQL search '{query}'")
+        resp.raise_for_status()
+        data = resp.json()
+        return data.get("data", {}).get("search", {}).get("nodes", [])
