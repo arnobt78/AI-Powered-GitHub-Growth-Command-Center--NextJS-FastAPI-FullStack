@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, BarChart3, CheckCircle2, ChevronDown, ChevronRight, Loader2, Sparkles } from "lucide-react";
+import { AlertTriangle, BarChart3, CheckCircle2, ChevronDown, ChevronRight, Loader2, Radar, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,6 +16,7 @@ const STATUS_META = {
 const KIND_META = {
   analytics: { icon: BarChart3, color: "text-sky-500", label: "Analytics" },
   content: { icon: Sparkles, color: "text-fuchsia-500", label: "Content" },
+  opportunities: { icon: Radar, color: "text-rose-500", label: "Opportunities" },
 } as const;
 
 export function RunRow({ run }: { run: PipelineRun }) {

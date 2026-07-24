@@ -29,5 +29,6 @@ class OpportunityAssembler(Stage):
                 title=item["title"],
                 url=item["url"],
             ))
+            existing_ids.add(item["external_id"])
         self.db.commit()
         return ctx
