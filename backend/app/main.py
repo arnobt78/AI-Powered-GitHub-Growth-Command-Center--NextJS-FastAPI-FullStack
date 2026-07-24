@@ -19,6 +19,7 @@ from app.api.drafts import router as drafts_router
 from app.api.runs import router as runs_router
 from app.api.providers import router as providers_router
 from app.api.users import router as users_router
+from app.api.demo_assets import router as demo_assets_router
 from app.db import SessionLocal
 from app.pipeline.jobs import run_pipeline_for_all_repos
 from app.pipeline.content_jobs import run_content_pipeline_for_all_repos
@@ -121,6 +122,7 @@ app.include_router(runs_router)
 app.include_router(providers_router)
 app.include_router(users_router)
 app.include_router(events_router)
+app.include_router(demo_assets_router)
 
 
 @app.get("/api/health")
