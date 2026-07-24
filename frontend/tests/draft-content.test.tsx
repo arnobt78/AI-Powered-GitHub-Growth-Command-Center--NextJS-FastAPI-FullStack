@@ -42,6 +42,18 @@ describe("DraftContent", () => {
     expect(screen.getByText("based on the raw release body")).toBeInTheDocument();
   });
 
+  it("renders suggested text and reason for issue_reply", () => {
+    render(<DraftContent kind="issue_reply" content={{ suggested: "Thanks for the report! Can you share more details?", reason: "acknowledges and asks for details" }} />);
+    expect(screen.getByText(/Thanks for the report/)).toBeInTheDocument();
+    expect(screen.getByText("acknowledges and asks for details")).toBeInTheDocument();
+  });
+
+  it("renders suggested text and reason for discussion_reply", () => {
+    render(<DraftContent kind="discussion_reply" content={{ suggested: "Great question — check the docs.", reason: "directly answers", discussion_node_id: "D_kwDOABCD1" }} />);
+    expect(screen.getByText(/Great question/)).toBeInTheDocument();
+    expect(screen.getByText("directly answers")).toBeInTheDocument();
+  });
+
   it("omits the reason line when reason is null", () => {
     render(<DraftContent kind="missing_doc_suggestion" content={{ suggested: "# Security Policy", reason: null }} />);
     expect(screen.getByText("# Security Policy")).toBeInTheDocument();
