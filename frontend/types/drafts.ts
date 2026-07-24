@@ -28,9 +28,17 @@ export interface SeoSuggestionContent {
 
 export type ReleaseNotesContent = MissingDocSuggestionContent;
 
+export type IssueReplyContent = MissingDocSuggestionContent;
+
+export interface DiscussionReplyContent extends MissingDocSuggestionContent {
+  discussion_node_id: string;
+}
+
 export type DraftKind =
   | "readme_suggestion"
   | "missing_doc_suggestion"
   | "topic_suggestion"
   | "seo_suggestion"
-  | "release_notes";
+  | "release_notes"
+  | "issue_reply"
+  | "discussion_reply";

@@ -22,6 +22,8 @@ const DRAFT_KIND_LABELS: Record<string, string> = {
   topic_suggestion: "Topic suggestion",
   seo_suggestion: "SEO suggestion",
   release_notes: "Release notes",
+  issue_reply: "Issue reply",
+  discussion_reply: "Discussion reply",
 } satisfies Record<DraftKind, string>;
 
 export function DraftsClient() {
@@ -82,7 +84,16 @@ export function DraftsClient() {
                     onClick={() =>
                       review.mutate(
                         { id: draft.id, status: "approved" },
-                        { onError: () => toast.error("Could not approve — try again.") },
+                        {
+                          onSuccess: (updated) => {
+                            if (updated.status === "posted") {
+                              toast.success("Reply posted to GitHub");
+                            } else if (updated.status === "failed") {
+                              toast.error(`Could not post: ${updated.error_message}`);
+                            }
+                          },
+                          onError: () => toast.error("Could not approve — try again."),
+                        },
                       )
                     }
                     disabled={review.isPending}

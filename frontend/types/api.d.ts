@@ -413,6 +413,8 @@ export interface components {
             };
             /** Status */
             status: string;
+            /** Error Message */
+            error_message: string | null;
             /**
              * Created At
              * Format: date-time
