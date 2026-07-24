@@ -14,6 +14,7 @@ from app.api.events import router as events_router
 from app.api.repos import router as repos_router
 from app.api.insights import router as insights_router
 from app.api.recommendations import router as recommendations_router
+from app.api.opportunities import router as opportunities_router
 from app.api.drafts import router as drafts_router
 from app.api.runs import router as runs_router
 from app.api.providers import router as providers_router
@@ -94,6 +95,7 @@ app.add_middleware(
 app.include_router(repos_router)
 app.include_router(insights_router)
 app.include_router(recommendations_router)
+app.include_router(opportunities_router)
 app.include_router(drafts_router)
 app.include_router(runs_router)
 app.include_router(providers_router)
