@@ -103,6 +103,20 @@ def test_get_video_404_for_not_ready_asset(client, seed_user):
     assert resp.status_code == 404
 
 
+def test_get_video_404_for_ready_asset_with_no_video_path(client, seed_user):
+    repo_id = _seed_repo(seed_user)
+    db = SessionLocal()
+    asset = DemoAsset(user_id=seed_user, repo_id=repo_id, status="ready", video_path=None)
+    db.add(asset)
+    db.commit()
+    asset_id = asset.id
+    db.close()
+
+    resp = client.get(f"/demo-assets/{asset_id}/video")
+
+    assert resp.status_code == 404
+
+
 def test_get_video_404_for_other_users_asset(client, other_user_client):
     repo_id = _seed_repo(other_user_client.test_user_id)
     asset_id = _seed_ready_asset(other_user_client.test_user_id, repo_id, "other-video.mp4")

@@ -28,6 +28,9 @@ out/
 # Logs
 *.log
 
+# Phase 4G demo asset storage
+backend/demo_assets/
+
 # Private ops docs (local only — not for public repo)
 docs/DOCKER_VPS_BACKEND_PLAYBOOK.md
 docs/HETZNER_VPS_MIGRATION_GUIDE.md
