@@ -29,5 +29,7 @@ class ContentExtractor(Stage):
             "stars": repo_data.get("stargazers_count", 0),
             "missing_docs": missing_docs,
             "latest_release": releases[0] if releases else None,
+            "open_issues": self.gh_client.list_repo_issues(owner, name),
+            "discussions": self.gh_client.list_repo_discussions(owner, name),
         }
         return ctx

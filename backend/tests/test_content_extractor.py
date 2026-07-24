@@ -16,6 +16,8 @@ def _fake_gh_client(missing: set[str] | None = None):
     gh.get_readme.return_value = "# Hello"
     gh.has_file.side_effect = lambda owner, name, path: path not in missing
     gh.list_releases.return_value = [{"tag_name": "v1.2.0", "body": "- Added dark mode", "published_at": "2026-07-20T00:00:00Z"}]
+    gh.list_repo_issues.return_value = [{"number": 42, "title": "Bug: crashes on startup", "body": "It crashes."}]
+    gh.list_repo_discussions.return_value = [{"id": "D_kwDOABCD1", "number": 7, "title": "How do I configure X?", "body": "Trying to set up X."}]
     return gh
 
 
@@ -63,3 +65,16 @@ def test_extractor_latest_release_is_none_when_no_releases_exist():
     ctx = ContentExtractor(gh_client=gh).run(ctx)
 
     assert ctx.raw["latest_release"] is None
+
+
+def test_extractor_populates_open_issues_and_discussions():
+    repo = Repo(owner="octocat", name="hello-world")
+    ctx = ContentPipelineContext(repo=repo)
+    gh = _fake_gh_client()
+
+    ctx = ContentExtractor(gh_client=gh).run(ctx)
+
+    assert ctx.raw["open_issues"][0]["number"] == 42
+    assert ctx.raw["discussions"][0]["number"] == 7
+    gh.list_repo_issues.assert_called_once_with("octocat", "hello-world")
+    gh.list_repo_discussions.assert_called_once_with("octocat", "hello-world")
