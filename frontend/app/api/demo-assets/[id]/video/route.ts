@@ -16,15 +16,27 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return new Response("Not authenticated", { status: 401 });
   }
 
+  const range = request.headers.get("range");
+
   const res = await fetch(`${BASE_URL}/demo-assets/${id}/video`, {
     headers: {
       Authorization: `Bearer ${API_KEY}`,
       "X-Internal-User-Token": mintInternalUserToken(githubId),
+      ...(range ? { Range: range } : {}),
     },
   });
 
-  return new Response(res.body, {
-    status: res.status,
-    headers: { "Content-Type": res.headers.get("content-type") ?? "video/mp4" },
-  });
+  // Forward the backend's range-response headers too (FastAPI's FileResponse
+  // supports Range and replies 206 + these) — without them the browser sees
+  // a body of unknown length and can't seek; Safari commonly refuses <video>
+  // playback outright without byte-range support.
+  const headers: Record<string, string> = { "Content-Type": res.headers.get("content-type") ?? "video/mp4" };
+  for (const name of ["content-length", "content-range", "accept-ranges"]) {
+    const value = res.headers.get(name);
+    if (value) {
+      headers[name] = value;
+    }
+  }
+
+  return new Response(res.body, { status: res.status, headers });
 }
