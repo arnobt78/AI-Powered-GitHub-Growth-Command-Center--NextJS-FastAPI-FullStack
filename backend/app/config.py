@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     email_from: str = ""
     frontend_base_url: str = ""
 
+    # Phase 4G: Demo asset generation
+    demo_assets_dir: str = "demo_assets"
+    demo_asset_retention_days: int = 3
+
 
 @lru_cache
 def get_settings() -> Settings:
