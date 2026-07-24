@@ -23,7 +23,7 @@ from app.token_crypto import decrypt_token
 def build_content_stages(db: Session, gh_client: GitHubClient, llm_router: LLMRouter) -> list:
     return [
         ContentExtractor(gh_client=gh_client),
-        ContentAnalyzer(),
+        ContentAnalyzer(db_session=db),
         ContentPreprocessor(),
         ContentOptimizer(),
         ContentSynthesizer(llm_router=llm_router),
