@@ -84,6 +84,25 @@ def _run_content_pipeline_background(user_id: int) -> None:
         db.close()
 
 
+@router.post("/opportunities", response_model=TriggerRunOut, status_code=202)
+@limiter.limit("10/minute")
+def trigger_opportunities_run(
+    request: Request, background_tasks: BackgroundTasks, current_user: User = Depends(require_user)
+) -> TriggerRunOut:
+    background_tasks.add_task(_run_opportunities_pipeline_background, current_user.id)
+    return TriggerRunOut(status="started")
+
+
+def _run_opportunities_pipeline_background(user_id: int) -> None:
+    from app.pipeline.opportunity_jobs import run_opportunities_pipeline_for_all_repos
+
+    db = SessionLocal()
+    try:
+        run_opportunities_pipeline_for_all_repos(db, user_id=user_id)
+    finally:
+        db.close()
+
+
 @router.get("/{run_id}/stages", response_model=list[StageRunOut])
 def list_run_stages(
     run_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_user)

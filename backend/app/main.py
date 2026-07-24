@@ -21,6 +21,7 @@ from app.api.users import router as users_router
 from app.db import SessionLocal
 from app.pipeline.jobs import run_pipeline_for_all_repos
 from app.pipeline.content_jobs import run_content_pipeline_for_all_repos
+from app.pipeline.opportunity_jobs import run_opportunities_pipeline_for_all_repos
 
 settings = get_settings()
 
@@ -43,6 +44,14 @@ def _scheduled_content_pipeline_run() -> None:
         db.close()
 
 
+def _scheduled_opportunities_run() -> None:
+    db = SessionLocal()
+    try:
+        run_opportunities_pipeline_for_all_repos(db)
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     scheduler.add_job(_scheduled_pipeline_run, "interval", hours=24, id="daily_pipeline_run")
@@ -55,6 +64,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         hours=24,
         id="daily_content_pipeline_run",
         next_run_time=datetime.now() + timedelta(hours=12),
+    )
+    # Offset a further 6h from the content job (18h total from analytics) so all
+    # three daily jobs' outbound HTTP calls are spread across the day.
+    scheduler.add_job(
+        _scheduled_opportunities_run,
+        "interval",
+        hours=24,
+        id="daily_opportunities_run",
+        next_run_time=datetime.now() + timedelta(hours=18),
     )
     scheduler.start()
     yield
