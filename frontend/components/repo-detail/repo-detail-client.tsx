@@ -7,6 +7,7 @@ import { BenchmarkTable } from "@/components/repo-detail/benchmark-table";
 import { ReferrersTable } from "@/components/repo-detail/referrers-table";
 import { PopularPathsTable } from "@/components/repo-detail/popular-paths-table";
 import { RepoRecommendations } from "@/components/repo-detail/repo-recommendations";
+import { DemoAssetsSection } from "@/components/repo-detail/demo-assets-section";
 import type { Repo } from "@/lib/api-types";
 
 export function RepoDetailClient({ repo }: { repo: Repo }) {
@@ -20,6 +21,7 @@ export function RepoDetailClient({ repo }: { repo: Repo }) {
         <PopularPathsTable repoId={repo.id} />
       </div>
       <RepoRecommendations repoId={repo.id} />
+      <DemoAssetsSection repoId={repo.id} />
     </div>
   );
 }
