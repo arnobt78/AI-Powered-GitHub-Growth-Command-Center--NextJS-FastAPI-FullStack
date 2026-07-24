@@ -8,5 +8,5 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return proxyRoute(() => api.triggerDemoAsset(Number(id)));
+  return proxyRoute(() => api.triggerDemoAsset(Number(id)), 202);
 }

@@ -7,7 +7,7 @@ import type { DemoAsset } from "@/lib/api-types";
 
 export function useDemoAssets(repoId: number) {
   return useQuery({
-    queryKey: queryKeys.demoAssets.all,
+    queryKey: queryKeys.demoAssets.forRepo(repoId),
     queryFn: () => fetchJson<DemoAsset[]>(`/api/repos/${repoId}/demo-assets`),
   });
 }
@@ -17,7 +17,7 @@ export function useTriggerDemoAsset(repoId: number) {
   return useMutation({
     mutationFn: () => fetchJson<{ status: string }>(`/api/repos/${repoId}/demo-assets`, { method: "POST" }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.demoAssets.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.demoAssets.forRepo(repoId) });
     },
   });
 }

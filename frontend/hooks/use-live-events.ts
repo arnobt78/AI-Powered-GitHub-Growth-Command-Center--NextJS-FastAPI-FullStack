@@ -19,7 +19,14 @@ const EVENT_QUERY_MAP: Record<string, QueryKey[]> = {
   drafts_generated: [queryKeys.drafts.all, queryKeys.runs.all],
   opportunities_generated: [queryKeys.opportunities.all, queryKeys.runs.all],
   opportunity_updated: [queryKeys.opportunities.all],
-  demo_asset_updated: [queryKeys.demoAssets.all],
+  // Payload only carries {id, status} where id is the demo asset id, not a repo_id
+  // (see backend app/demo_asset_jobs.py) — there's no repoId to build a scoped
+  // ["repos", repoId, "demo-assets"] key from, and falling back to a broad
+  // queryKeys.repos.all prefix match would over-invalidate every other repo-scoped
+  // query (snapshots, insights, benchmarks, ...) for every repo just to catch demo
+  // assets. useTriggerDemoAsset's own onSuccess already invalidates the triggering
+  // tab; cross-tab refresh for other tabs viewing the same repo is left as a
+  // nice-to-have, not wired here.
   user_updated: [queryKeys.users.me],
 };
 

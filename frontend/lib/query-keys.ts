@@ -25,7 +25,7 @@ export const queryKeys = {
     all: ["opportunities"] as const,
   },
   demoAssets: {
-    all: ["demo-assets"] as const,
+    forRepo: (repoId: number) => ["repos", repoId, "demo-assets"] as const,
   },
   users: {
     me: ["users", "me"] as const,

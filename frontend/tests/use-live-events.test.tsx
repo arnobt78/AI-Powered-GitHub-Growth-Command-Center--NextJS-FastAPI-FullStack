@@ -127,7 +127,7 @@ describe("useLiveEvents", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.opportunities.all });
   });
 
-  it("invalidates demoAssets.all when demo_asset_updated arrives", () => {
+  it("does not invalidate any query for demo_asset_updated (no repoId in payload to scope by; the triggering tab's own mutation onSuccess handles invalidation instead)", () => {
     const queryClient = new QueryClient();
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
 
@@ -140,7 +140,7 @@ describe("useLiveEvents", () => {
     const source = FakeEventSource.instances[0];
     source.emit("demo_asset_updated", { id: 1, status: "ready" });
 
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.demoAssets.all });
+    expect(invalidateSpy).not.toHaveBeenCalled();
   });
 
   it("invalidates the users.me query when a user_updated event arrives", () => {
