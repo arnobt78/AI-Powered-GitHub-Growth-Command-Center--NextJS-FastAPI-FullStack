@@ -36,6 +36,12 @@ class ContentAssembler(Stage):
                 "keywords": task.winner["keywords"],
                 "reason": task.winner_reason,
             }
-        if task.kind in ("missing_doc_suggestion", "release_notes"):
+        if task.kind == "discussion_reply":
+            return {
+                "suggested": task.winner,
+                "reason": task.winner_reason,
+                "discussion_node_id": task.source_material["discussion_node_id"],
+            }
+        if task.kind in ("missing_doc_suggestion", "release_notes", "issue_reply"):
             return {"suggested": task.winner, "reason": task.winner_reason}
         return {"current": task.current, "suggested": task.winner, "reason": task.winner_reason}

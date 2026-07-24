@@ -88,3 +88,37 @@ def test_assembler_does_not_advance_last_release_tag_for_invalid_task(seed_user)
     db.refresh(repo)
     assert repo.last_release_tag is None
     db.close()
+
+
+def test_assembler_writes_issue_reply_draft(seed_user):
+    db, repo = _db_and_repo(seed_user)
+    ctx = ContentPipelineContext(repo=repo)
+    ctx.tasks = [
+        ContentTask(kind="issue_reply", target="issue:42", structured=False, current=None, winner="Thanks for the report!", winner_reason="acknowledges and asks for details", valid=True),
+    ]
+
+    ctx = ContentAssembler(db_session=db).run(ctx)
+
+    draft = db.query(Draft).filter_by(repo_id=repo.id, kind="issue_reply").one()
+    assert draft.target == "issue:42"
+    assert draft.content == {"suggested": "Thanks for the report!", "reason": "acknowledges and asks for details"}
+    db.close()
+
+
+def test_assembler_writes_discussion_reply_draft_with_node_id(seed_user):
+    db, repo = _db_and_repo(seed_user)
+    ctx = ContentPipelineContext(repo=repo)
+    ctx.tasks = [
+        ContentTask(
+            kind="discussion_reply", target="discussion:7", structured=False, current=None,
+            winner="Great question!", winner_reason="directly answers", valid=True,
+            source_material={"discussion_node_id": "D_kwDOABCD1"},
+        ),
+    ]
+
+    ctx = ContentAssembler(db_session=db).run(ctx)
+
+    draft = db.query(Draft).filter_by(repo_id=repo.id, kind="discussion_reply").one()
+    assert draft.target == "discussion:7"
+    assert draft.content == {"suggested": "Great question!", "reason": "directly answers", "discussion_node_id": "D_kwDOABCD1"}
+    db.close()
