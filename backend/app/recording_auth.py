@@ -6,7 +6,7 @@ import time
 
 from app.config import get_settings
 
-TOKEN_TTL_SECONDS = 300
+TOKEN_TTL_SECONDS = 60
 
 
 def _sign(payload_b64: str) -> str:
@@ -22,8 +22,11 @@ def mint_recording_token(repo_id: int, user_id: int) -> str:
     drives — mirrors frontend/lib/internal-auth.ts's scheme in reverse (this
     backend mints, frontend/lib/recording-auth.ts verifies). Bound to one
     repo_id so a captured/logged token can't be replayed against a repo the
-    minting user doesn't own; 5-minute TTL covers a multi-URL recording
-    session's navigation + dwell time, not indefinite reuse."""
+    minting user doesn't own; 60s TTL (matching internal_auth's own token
+    lifetime) comfortably covers one page load + dwell, not indefinite
+    reuse."""
+    if not get_settings().recording_auth_secret:
+        raise RuntimeError("RECORDING_AUTH_SECRET is not configured")
     payload = json.dumps(
         {"repo_id": repo_id, "user_id": user_id, "exp": int(time.time()) + TOKEN_TTL_SECONDS}
     )

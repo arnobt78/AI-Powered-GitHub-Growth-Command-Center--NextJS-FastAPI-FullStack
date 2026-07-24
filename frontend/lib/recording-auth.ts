@@ -2,7 +2,12 @@ import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 const SECRET = process.env.RECORDING_AUTH_SECRET ?? "";
-const TOKEN_TTL_SECONDS = 300;
+// Matches the recorder's actual single-page, one-navigation usage (see
+// backend/app/recording_auth.py) — kept tight since this token is also the
+// bypass's replay window (an empty SECRET would make this fail-closed
+// instead, see the check below, but a short TTL still limits a leaked
+// token's usefulness).
+const TOKEN_TTL_SECONDS = 60;
 
 function sign(payloadB64: string): string {
   return createHmac("sha256", SECRET).update(payloadB64).digest("hex");
@@ -28,6 +33,14 @@ export function mintRecordingToken(repoId: number, userId: number): string {
 // fields) — deliberately non-throwing since the caller (auth.ts's authorized
 // callback) just needs a yes/no gate, not exception handling per request.
 export function verifyRecordingToken(token: string): { repoId: number; userId: number } | null {
+  // Fail closed, not open: an unset secret must never make every token's
+  // signature trivially forgeable (createHmac("sha256", "") is still a
+  // valid, predictable key). A misconfigured deploy should break the
+  // recorder loudly, not silently open this app's global auth gate to
+  // anyone who reads this file.
+  if (!SECRET) {
+    return null;
+  }
   const parts = token.split(".");
   if (parts.length !== 2) {
     return null;
@@ -63,7 +76,7 @@ export function verifyRecordingToken(token: string): { repoId: number; userId: n
 // actual page being requested, so a captured/logged token can't be replayed
 // against a different repo the token wasn't minted for.
 function repoIdFromPathname(pathname: string): number | null {
-  const match = pathname.match(/^\/repos\/(\d+)(?:\/|$)/);
+  const match = pathname.match(/^\/repos\/(\d+)\/?$/);
   if (!match) {
     return null;
   }
@@ -72,7 +85,10 @@ function repoIdFromPathname(pathname: string): number | null {
 
 // The single check auth.ts's authorized callback delegates to: does this
 // request carry a valid, unexpired recording_token whose bound repo_id
-// matches the repo-detail page it's actually requesting?
+// matches the repo-detail page it's actually requesting? userId is part of
+// the signed payload (an audit trail of who triggered the recording) but
+// deliberately not enforced here — repo_id is the only scope this gate
+// grants or checks.
 export function isAuthorizedRecordingRequest(request: { nextUrl: URL }): boolean {
   const token = request.nextUrl.searchParams.get("recording_token");
   if (!token) {

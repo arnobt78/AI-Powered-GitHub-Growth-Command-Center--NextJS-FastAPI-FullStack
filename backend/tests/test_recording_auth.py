@@ -1,6 +1,9 @@
 import base64
 import json
 
+import pytest
+
+import app.recording_auth as recording_auth_module
 from app.recording_auth import mint_recording_token
 
 
@@ -24,3 +27,13 @@ def test_mint_produces_different_signature_for_different_repo():
     _payload_a, sig_a = token_a.rsplit(".", 1)
     _payload_b, sig_b = token_b.rsplit(".", 1)
     assert sig_a != sig_b
+
+
+def test_mint_refuses_to_produce_a_token_when_secret_is_not_configured(monkeypatch):
+    class _FakeSettings:
+        recording_auth_secret = ""
+
+    monkeypatch.setattr(recording_auth_module, "get_settings", lambda: _FakeSettings())
+
+    with pytest.raises(RuntimeError):
+        recording_auth_module.mint_recording_token(repo_id=1, user_id=1)
