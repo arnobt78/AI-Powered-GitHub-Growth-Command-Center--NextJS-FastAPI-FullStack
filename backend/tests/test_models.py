@@ -1,5 +1,5 @@
 from app.db import Base, engine, SessionLocal
-from app.models import Repo, User, Opportunity
+from app.models import Repo, User, Opportunity, Draft
 
 
 def test_create_and_query_repo(seed_user):
@@ -132,4 +132,40 @@ def test_create_opportunity_scoped_to_repo_and_user():
     fetched = db.query(Opportunity).filter_by(repo_id=repo.id).one()
     assert fetched.source == "hacker_news"
     assert fetched.external_id == "12345"
+    db.close()
+
+
+def test_draft_error_message_defaults_none_and_is_settable():
+    db = SessionLocal()
+    user = User(
+        github_id="999",
+        username="draft-error-tester",
+        avatar_url="https://avatars.githubusercontent.com/u/999",
+        email=None,
+        access_token_encrypted="ciphertext-placeholder",
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    draft = Draft(
+        user_id=user.id,
+        repo_id=None,
+        kind="issue_reply",
+        target="issue:1",
+        content={"suggested": "Thanks for the report!", "reason": "acknowledges the issue"},
+        status="pending",
+    )
+    db.add(draft)
+    db.commit()
+    db.refresh(draft)
+
+    assert draft.error_message is None
+
+    draft.status = "failed"
+    draft.error_message = "GitHub token rejected"
+    db.commit()
+    db.refresh(draft)
+
+    assert draft.error_message == "GitHub token rejected"
     db.close()

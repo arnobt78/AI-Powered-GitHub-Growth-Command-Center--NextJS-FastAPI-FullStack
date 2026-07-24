@@ -165,6 +165,11 @@ class Draft(Base):
     status: Mapped[str] = mapped_column(String(50), default="pending")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Set only when status transitions to "failed" — currently only
+    # issue_reply/discussion_reply can reach "failed" (posting to GitHub can
+    # fail); every other kind's approve is a pure status flip with nothing
+    # that can fail. Null otherwise.
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class Opportunity(Base):
