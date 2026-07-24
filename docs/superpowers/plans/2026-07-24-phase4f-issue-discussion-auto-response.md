@@ -1,0 +1,1393 @@
+# Phase 4F: Issue/Discussion Auto-Response Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Approving an `issue_reply`/`discussion_reply` Draft synchronously posts the LLM-drafted reply to the real GitHub issue/discussion; rejecting never posts anything. Two new `ContentTask` kinds detect new issues/discussions on tracked repos and draft replies through the existing content pipeline.
+
+**Architecture:** `GitHubClient` gains 2 read methods (list issues/discussions for one owned repo) and 2 write methods (post a comment/reply — the project's first write capability, called only from the on-approve handler, never the pipeline). `ContentAnalyzer` gains DB access to dedup against already-drafted `(repo_id, kind, target)` combos instead of a high-water-mark column. `app/api/drafts.py`'s `PATCH /drafts/{id}` gains a kind-specific dispatch that posts synchronously and sets `status` to `"posted"`/`"failed"`.
+
+**Tech Stack:** FastAPI, SQLAlchemy 2.0, Alembic, httpx, pytest (backend); Next.js 16 App Router, Vitest (frontend).
+
+## Global Constraints
+
+- `GitHubClient.create_issue_comment`/`create_discussion_comment` are called ONLY from `app/api/drafts.py`'s on-approve handler — never from any pipeline stage.
+- Posting happens synchronously inside `PATCH /drafts/{id}` — no `BackgroundTasks`, no new SSE event beyond the existing `draft_updated`.
+- Dedup: before creating an `issue_reply`/`discussion_reply` task, check whether a `Draft` already exists for `(repo_id, kind, target)` — regardless of its status — and skip if so. No new `Repo` columns.
+- Rejecting a Draft never posts anything, for any kind.
+- Every other existing Draft kind's approve behavior is completely unaffected (still ends in `status="approved"`, no posting attempted).
+- Full spec: `docs/superpowers/specs/2026-07-24-phase4f-issue-discussion-auto-response-design.md`.
+
+---
+
+### Task 1: `Draft.error_message` column + migration
+
+**Files:**
+- Modify: `backend/app/models.py`
+- Create: `backend/alembic/versions/<hash>_add_error_message_to_drafts.py`
+- Test: `backend/tests/test_models.py`
+
+**Interfaces:**
+- Produces: `Draft.error_message: str | None` — nullable, consumed by `app/api/drafts.py` (Task 8).
+
+- [ ] **Step 1: Write the failing test**
+
+Add to `backend/tests/test_models.py` (add `Draft` to the existing `from app.models import ...` line if not already imported):
+
+```python
+def test_draft_error_message_defaults_none_and_is_settable():
+    db = SessionLocal()
+    user = User(
+        github_id="999",
+        username="draft-error-tester",
+        avatar_url="https://avatars.githubusercontent.com/u/999",
+        email=None,
+        access_token_encrypted="ciphertext-placeholder",
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    draft = Draft(
+        user_id=user.id,
+        repo_id=None,
+        kind="issue_reply",
+        target="issue:1",
+        content={"suggested": "Thanks for the report!", "reason": "acknowledges the issue"},
+        status="pending",
+    )
+    db.add(draft)
+    db.commit()
+    db.refresh(draft)
+
+    assert draft.error_message is None
+
+    draft.status = "failed"
+    draft.error_message = "GitHub token rejected"
+    db.commit()
+    db.refresh(draft)
+
+    assert draft.error_message == "GitHub token rejected"
+    db.close()
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `cd backend && .venv/bin/python -m pytest tests/test_models.py::test_draft_error_message_defaults_none_and_is_settable -v`
+Expected: FAIL with `AttributeError: 'Draft' object has no attribute 'error_message'`
+
+- [ ] **Step 3: Add the column**
+
+In `backend/app/models.py`, inside `class Draft(Base):`, immediately after `reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)`, add:
+
+```python
+    # Set only when status transitions to "failed" — currently only
+    # issue_reply/discussion_reply can reach "failed" (posting to GitHub can
+    # fail); every other kind's approve is a pure status flip with nothing
+    # that can fail. Null otherwise.
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+```
+
+(Confirm `Text` is already imported at the top of `models.py` — it is, used by `Recommendation.body`.)
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `cd backend && .venv/bin/python -m pytest tests/test_models.py -v`
+Expected: all pass, including the new test.
+
+- [ ] **Step 5: Generate and review the migration**
+
+Run: `cd backend && .venv/bin/python -m alembic revision --autogenerate -m "add error_message to drafts"`
+
+Confirm `down_revision = 'a9a66f6a802f'` (verify with `.venv/bin/python -m alembic heads` first) and body:
+
+```python
+def upgrade() -> None:
+    # ### commands auto generated by Alembic - please adjust! ###
+    op.add_column('drafts', sa.Column('error_message', sa.Text(), nullable=True))
+    # ### end Alembic commands ###
+
+
+def downgrade() -> None:
+    # ### commands auto generated by Alembic - please adjust! ###
+    op.drop_column('drafts', 'error_message')
+    # ### end Alembic commands ###
+```
+
+Do not run `alembic upgrade head` against a real database — deferred to the Product Owner, same as every prior migration.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add backend/app/models.py backend/alembic/versions/*_add_error_message_to_drafts.py backend/tests/test_models.py
+git commit -m "feat(4f): add Draft.error_message"
+```
+
+---
+
+### Task 2: `GitHubClient` read methods — `list_repo_issues` + `list_repo_discussions`
+
+**Files:**
+- Modify: `backend/app/github_client.py`
+- Test: `backend/tests/test_github_client.py`
+
+**Interfaces:**
+- Produces: `GitHubClient.list_repo_issues(owner, name, limit=20) -> list[dict]`, `GitHubClient.list_repo_discussions(owner, name, limit=10) -> list[dict]`. Consumed by `app/pipeline/content/extractor.py` (Task 4).
+
+- [ ] **Step 1: Write the failing tests**
+
+Add to the existing `mock_transport` fixture's `handler` function in `backend/tests/test_github_client.py` (before the final `return httpx.Response(404)`):
+
+```python
+        if request.url.path == "/repos/octocat/hello-world/issues":
+            return httpx.Response(200, json=[
+                {"number": 42, "title": "Bug: crashes on startup", "body": "It crashes."},
+                {"number": 41, "title": "PR: fix typo", "body": "Fixes a typo.", "pull_request": {"url": "https://api.github.com/..."}},
+            ])
+        if request.url.path == "/graphql" and request.method == "POST":
+            import json as json_module
+            payload = json_module.loads(request.read())
+            if "discussions" in payload["query"]:
+                return httpx.Response(200, json={
+                    "data": {"repository": {"discussions": {"nodes": [
+                        {"id": "D_kwDOABCD1", "number": 7, "title": "How do I configure X?", "body": "Trying to set up X.", "url": "https://github.com/octocat/hello-world/discussions/7"},
+                    ]}}}
+                })
+```
+
+(This branch must come before the existing `/graphql` branch from `search_discussions`'s test setup — check the existing handler's `if` order and add this as an earlier, more specific check, or combine the conditions so both `search_discussions`'s and this task's GraphQL branches coexist without one shadowing the other. Read the current handler function first.)
+
+Then add:
+
+```python
+def test_list_repo_issues_excludes_pull_requests(gh_client):
+    issues = gh_client.list_repo_issues("octocat", "hello-world")
+    assert len(issues) == 1
+    assert issues[0]["number"] == 42
+    assert issues[0]["title"] == "Bug: crashes on startup"
+
+
+def test_list_repo_discussions_returns_nodes(gh_client):
+    discussions = gh_client.list_repo_discussions("octocat", "hello-world")
+    assert discussions[0]["number"] == 7
+    assert discussions[0]["id"] == "D_kwDOABCD1"
+
+
+def test_list_repo_discussions_null_safe_on_partial_error():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"data": {"repository": None}})
+
+    http = httpx.Client(base_url="https://api.github.com", transport=httpx.MockTransport(handler))
+    client = GitHubClient(token="fake-token", http_client=http)
+
+    assert client.list_repo_discussions("octocat", "hello-world") == []
+
+
+def test_list_repo_discussions_raises_needs_reauth_on_401():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(401)
+
+    http = httpx.Client(base_url="https://api.github.com", transport=httpx.MockTransport(handler))
+    client = GitHubClient(token="fake-token", http_client=http)
+
+    with pytest.raises(GitHubAuthError):
+        client.list_repo_discussions("octocat", "hello-world")
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `cd backend && .venv/bin/python -m pytest tests/test_github_client.py -v -k "list_repo"`
+Expected: FAIL with `AttributeError: 'GitHubClient' object has no attribute 'list_repo_issues'`
+
+- [ ] **Step 3: Implement both methods**
+
+In `backend/app/github_client.py`, add these two methods (place them near `search_discussions`):
+
+```python
+    def list_repo_issues(self, owner: str, name: str, limit: int = 20) -> list[dict]:
+        """Open issues only, newest first, PRs excluded — GitHub's issues
+        endpoint returns PRs as a subtype (each carries a 'pull_request' key)."""
+        resp = self._get(
+            f"/repos/{owner}/{name}/issues",
+            params={"state": "open", "sort": "created", "direction": "desc", "per_page": limit},
+        )
+        return [issue for issue in resp.json() if "pull_request" not in issue]
+
+    def list_repo_discussions(self, owner: str, name: str, limit: int = 10) -> list[dict]:
+        graphql_query = """
+        query($owner: String!, $name: String!, $limit: Int!) {
+          repository(owner: $owner, name: $name) {
+            discussions(first: $limit, orderBy: {field: CREATED_AT, direction: DESC}) {
+              nodes { id number title body url }
+            }
+          }
+        }
+        """
+        resp = self._http.post(
+            "/graphql",
+            json={"query": graphql_query, "variables": {"owner": owner, "name": name, "limit": limit}},
+        )
+        if resp.status_code == 401:
+            raise GitHubAuthError(f"needs_reauth: GitHub token rejected listing discussions for {owner}/{name}")
+        resp.raise_for_status()
+        data = resp.json().get("data") or {}
+        repo = data.get("repository") or {}
+        discussions = repo.get("discussions") or {}
+        return discussions.get("nodes") or []
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `cd backend && .venv/bin/python -m pytest tests/test_github_client.py -v`
+Expected: all pass, including the 4 new tests, no regressions to any existing test (including `search_discussions`'s tests from Phase 4D — confirm the shared mock handler's `/graphql` branches don't shadow each other).
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add backend/app/github_client.py backend/tests/test_github_client.py
+git commit -m "feat(4f): add GitHubClient.list_repo_issues + list_repo_discussions"
+```
+
+---
+
+### Task 3: `GitHubClient` write methods — `create_issue_comment` + `create_discussion_comment`
+
+**Files:**
+- Modify: `backend/app/github_client.py`
+- Test: `backend/tests/test_github_client.py`
+
+**Interfaces:**
+- Produces: `GitHubClient.create_issue_comment(owner, name, issue_number, body) -> dict`, `GitHubClient.create_discussion_comment(discussion_id, body) -> dict`. Consumed ONLY by `app/api/drafts.py`'s on-approve handler (Task 8) — never by any pipeline stage.
+
+- [ ] **Step 1: Write the failing tests**
+
+Add to `backend/tests/test_github_client.py`:
+
+```python
+def test_create_issue_comment_posts_body():
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/repos/octocat/hello-world/issues/42/comments":
+            import json as json_module
+            captured["body"] = json_module.loads(request.read())
+            return httpx.Response(201, json={"id": 999, "body": captured["body"]["body"]})
+        return httpx.Response(404)
+
+    http = httpx.Client(base_url="https://api.github.com", transport=httpx.MockTransport(handler))
+    client = GitHubClient(token="fake-token", http_client=http)
+
+    result = client.create_issue_comment("octocat", "hello-world", 42, "Thanks for the report!")
+
+    assert captured["body"] == {"body": "Thanks for the report!"}
+    assert result["id"] == 999
+
+
+def test_create_issue_comment_raises_needs_reauth_on_401():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(401)
+
+    http = httpx.Client(base_url="https://api.github.com", transport=httpx.MockTransport(handler))
+    client = GitHubClient(token="fake-token", http_client=http)
+
+    with pytest.raises(GitHubAuthError):
+        client.create_issue_comment("octocat", "hello-world", 42, "reply")
+
+
+def test_create_discussion_comment_posts_mutation():
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/graphql" and request.method == "POST":
+            import json as json_module
+            payload = json_module.loads(request.read())
+            captured["variables"] = payload["variables"]
+            return httpx.Response(200, json={"data": {"addDiscussionComment": {"comment": {"id": "DC_123"}}}})
+        return httpx.Response(404)
+
+    http = httpx.Client(base_url="https://api.github.com", transport=httpx.MockTransport(handler))
+    client = GitHubClient(token="fake-token", http_client=http)
+
+    result = client.create_discussion_comment("D_kwDOABCD1", "Great question!")
+
+    assert captured["variables"] == {"discussionId": "D_kwDOABCD1", "body": "Great question!"}
+    assert result["data"]["addDiscussionComment"]["comment"]["id"] == "DC_123"
+
+
+def test_create_discussion_comment_raises_needs_reauth_on_401():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(401)
+
+    http = httpx.Client(base_url="https://api.github.com", transport=httpx.MockTransport(handler))
+    client = GitHubClient(token="fake-token", http_client=http)
+
+    with pytest.raises(GitHubAuthError):
+        client.create_discussion_comment("D_kwDOABCD1", "reply")
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `cd backend && .venv/bin/python -m pytest tests/test_github_client.py -v -k "create_issue_comment or create_discussion_comment"`
+Expected: FAIL with `AttributeError: 'GitHubClient' object has no attribute 'create_issue_comment'`
+
+- [ ] **Step 3: Implement both methods**
+
+In `backend/app/github_client.py`, add these two methods (place them after `list_repo_discussions`):
+
+```python
+    def create_issue_comment(self, owner: str, name: str, issue_number: int, body: str) -> dict:
+        """The first write method on this client — called ONLY from the
+        Draft on-approve handler (app/api/drafts.py), never from any
+        pipeline stage. Every pipeline stage remains read-only."""
+        resp = self._http.post(f"/repos/{owner}/{name}/issues/{issue_number}/comments", json={"body": body})
+        if resp.status_code == 401:
+            raise GitHubAuthError(f"needs_reauth: GitHub token rejected posting to {owner}/{name}#{issue_number}")
+        resp.raise_for_status()
+        return resp.json()
+
+    def create_discussion_comment(self, discussion_id: str, body: str) -> dict:
+        """Same write-only-from-drafts-approval rule as create_issue_comment."""
+        graphql_query = """
+        mutation($discussionId: ID!, $body: String!) {
+          addDiscussionComment(input: {discussionId: $discussionId, body: $body}) {
+            comment { id }
+          }
+        }
+        """
+        resp = self._http.post(
+            "/graphql", json={"query": graphql_query, "variables": {"discussionId": discussion_id, "body": body}}
+        )
+        if resp.status_code == 401:
+            raise GitHubAuthError("needs_reauth: GitHub token rejected posting a discussion comment")
+        resp.raise_for_status()
+        return resp.json()
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `cd backend && .venv/bin/python -m pytest tests/test_github_client.py -v`
+Expected: all pass, including the 4 new tests, no regressions.
+
+Then run the full backend suite once: `cd backend && .venv/bin/python -m pytest -q` — expect all pass.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add backend/app/github_client.py backend/tests/test_github_client.py
+git commit -m "feat(4f): add GitHubClient.create_issue_comment + create_discussion_comment"
+```
+
+---
+
+### Task 4: `ContentExtractor` fetches open issues + discussions
+
+**Files:**
+- Modify: `backend/app/pipeline/content/extractor.py`
+- Test: `backend/tests/test_content_extractor.py`
+
+**Interfaces:**
+- Consumes: `GitHubClient.list_repo_issues`, `GitHubClient.list_repo_discussions` (Task 2).
+- Produces: `ctx.raw["open_issues"]: list[dict]`, `ctx.raw["discussions"]: list[dict]`. Consumed by `app/pipeline/content/analyzer.py` (Task 5).
+
+- [ ] **Step 1: Write the failing tests**
+
+Extend `_fake_gh_client` in `backend/tests/test_content_extractor.py` with 2 new stubbed methods (add before `return gh`):
+
+```python
+    gh.list_repo_issues.return_value = [{"number": 42, "title": "Bug: crashes on startup", "body": "It crashes."}]
+    gh.list_repo_discussions.return_value = [{"id": "D_kwDOABCD1", "number": 7, "title": "How do I configure X?", "body": "Trying to set up X."}]
+```
+
+Then add:
+
+```python
+def test_extractor_populates_open_issues_and_discussions():
+    repo = Repo(owner="octocat", name="hello-world")
+    ctx = ContentPipelineContext(repo=repo)
+    gh = _fake_gh_client()
+
+    ctx = ContentExtractor(gh_client=gh).run(ctx)
+
+    assert ctx.raw["open_issues"][0]["number"] == 42
+    assert ctx.raw["discussions"][0]["number"] == 7
+    gh.list_repo_issues.assert_called_once_with("octocat", "hello-world")
+    gh.list_repo_discussions.assert_called_once_with("octocat", "hello-world")
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `cd backend && .venv/bin/python -m pytest tests/test_content_extractor.py -v -k open_issues`
+Expected: FAIL with `KeyError: 'open_issues'`
+
+- [ ] **Step 3: Implement the fetches**
+
+In `backend/app/pipeline/content/extractor.py`, update `run` to add the two new fetches. Full updated method:
+
+```python
+    def run(self, ctx: ContentPipelineContext) -> ContentPipelineContext:
+        owner, name = ctx.repo.owner, ctx.repo.name
+        repo_data = self.gh_client.get_repo(owner, name)
+
+        missing_docs = [f for f in STANDARD_DOC_FILES if not self.gh_client.has_file(owner, name, f)]
+        releases = self.gh_client.list_releases(owner, name, limit=1)
+
+        ctx.raw = {
+            "repo": repo_data,
+            "readme": self.gh_client.get_readme(owner, name),
+            "topics": repo_data.get("topics", []),
+            "description": repo_data.get("description"),
+            "stars": repo_data.get("stargazers_count", 0),
+            "missing_docs": missing_docs,
+            "latest_release": releases[0] if releases else None,
+            "open_issues": self.gh_client.list_repo_issues(owner, name),
+            "discussions": self.gh_client.list_repo_discussions(owner, name),
+        }
+        return ctx
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `cd backend && .venv/bin/python -m pytest tests/test_content_extractor.py -v`
+Expected: all pass, including the new test, no regressions.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add backend/app/pipeline/content/extractor.py backend/tests/test_content_extractor.py
+git commit -m "feat(4f): ContentExtractor fetches open issues and discussions"
+```
+
+---
+
+### Task 5: `ContentAnalyzer` gains `db_session` + dedup + task creation
+
+**Files:**
+- Modify: `backend/app/pipeline/content/analyzer.py`
+- Modify: `backend/app/pipeline/content_jobs.py`
+- Modify: `backend/tests/test_content_analyzer.py`
+- Test: `backend/tests/test_content_analyzer.py`
+
+**Interfaces:**
+- Consumes: `ctx.raw["open_issues"]`, `ctx.raw["discussions"]` (Task 4).
+- Produces: `ContentAnalyzer(db_session: Session)` (constructor signature change — every existing call site must be updated), creates `ContentTask(kind="issue_reply", ...)`/`ContentTask(kind="discussion_reply", ...)` only when no `Draft` already exists for that `(repo_id, kind, target)`.
+
+- [ ] **Step 1: Update all 8 existing test call sites**
+
+`ContentAnalyzer`'s constructor is changing from no-args to requiring `db_session`. `backend/tests/test_content_analyzer.py` currently has 8 call sites of the form `ContentAnalyzer().run(...)`. Before writing new tests, update the file's `_ctx` helper and every existing test to pass a real DB session, since the dedup check needs one. `Repo.user_id` is NOT NULL (a real `FK` to `users.id`), so committing a `Repo` requires a real user — use the `seed_user` fixture already defined in `conftest.py` (creates github_id `"12345"`, returns its integer id) rather than passing `user_id=None`, which would raise a NOT NULL constraint violation on `db.commit()`.
+
+Update the `_ctx` helper to take `user_id` and attach a real, committed `Repo` (needed because the dedup query filters by `ctx.repo.id`, which must be a real integer):
+
+```python
+def _ctx(user_id: int, **raw_overrides) -> ContentPipelineContext:
+    db = SessionLocal()
+    repo = Repo(owner="octocat", name="hello-world", user_id=user_id)
+    db.add(repo)
+    db.commit()
+    db.refresh(repo)
+    ctx = ContentPipelineContext(repo=repo)
+    ctx.raw = {
+        "readme": "# Hello",
+        "topics": ["cli"],
+        "description": "A tool",
+        "missing_docs": ["SECURITY.md"],
+        "open_issues": [],
+        "discussions": [],
+    }
+    ctx.raw.update(raw_overrides)
+    return ctx, db
+```
+
+Note this now returns a `(ctx, db)` tuple instead of just `ctx`, and takes `user_id` as its first positional argument. Update every existing test in the file to accept the `seed_user` fixture, pass it to `_ctx`, destructure the tuple, and pass `db` into `ContentAnalyzer`:
+
+```python
+def test_analyzer_always_builds_readme_and_seo_tasks(seed_user):
+    ctx, db = _ctx(seed_user)
+    ctx = ContentAnalyzer(db_session=db).run(ctx)
+    kinds = [t.kind for t in ctx.tasks]
+    assert "readme_suggestion" in kinds
+    assert "seo_suggestion" in kinds
+    db.close()
+
+
+def test_analyzer_builds_one_task_per_missing_doc(seed_user):
+    ctx, db = _ctx(seed_user, missing_docs=["SECURITY.md", "CODE_OF_CONDUCT.md"])
+    ctx = ContentAnalyzer(db_session=db).run(ctx)
+    doc_tasks = [t for t in ctx.tasks if t.kind == "missing_doc_suggestion"]
+    assert {t.target for t in doc_tasks} == {"SECURITY.md", "CODE_OF_CONDUCT.md"}
+    assert all(t.current is None and t.structured is False for t in doc_tasks)
+    db.close()
+
+
+def test_analyzer_skips_topic_task_when_already_well_tagged(seed_user):
+    ctx, db = _ctx(seed_user, topics=["a", "b", "c", "d", "e"])
+    ctx = ContentAnalyzer(db_session=db).run(ctx)
+    assert not any(t.kind == "topic_suggestion" for t in ctx.tasks)
+    db.close()
+
+
+def test_analyzer_builds_topic_task_when_under_tagged(seed_user):
+    ctx, db = _ctx(seed_user, topics=["cli"])
+    ctx = ContentAnalyzer(db_session=db).run(ctx)
+    topic_task = next(t for t in ctx.tasks if t.kind == "topic_suggestion")
+    assert topic_task.current == ["cli"]
+    assert topic_task.structured is True
+    db.close()
+
+
+def test_analyzer_builds_release_notes_task_for_new_release(seed_user):
+    ctx, db = _ctx(seed_user, latest_release={"tag_name": "v1.2.0", "body": "- Added dark mode"})
+    ctx = ContentAnalyzer(db_session=db).run(ctx)
+    release_task = next(t for t in ctx.tasks if t.kind == "release_notes")
+    assert release_task.target == "v1.2.0"
+    assert release_task.current is None
+    assert release_task.structured is False
+    assert release_task.source_material == {"tag": "v1.2.0", "raw_notes": "- Added dark mode", "repo_name": "hello-world"}
+    db.close()
+
+
+def test_analyzer_skips_release_notes_task_when_tag_already_drafted(seed_user):
+    ctx, db = _ctx(seed_user, latest_release={"tag_name": "v1.2.0", "body": "- Added dark mode"})
+    ctx.repo.last_release_tag = "v1.2.0"
+    ctx = ContentAnalyzer(db_session=db).run(ctx)
+    assert not any(t.kind == "release_notes" for t in ctx.tasks)
+    db.close()
+
+
+def test_analyzer_skips_release_notes_task_when_body_is_empty(seed_user):
+    ctx, db = _ctx(seed_user, latest_release={"tag_name": "v1.2.0", "body": ""})
+    ctx = ContentAnalyzer(db_session=db).run(ctx)
+    assert not any(t.kind == "release_notes" for t in ctx.tasks)
+    db.close()
+
+
+def test_analyzer_skips_release_notes_task_when_no_release_exists(seed_user):
+    ctx, db = _ctx(seed_user, latest_release=None)
+    ctx = ContentAnalyzer(db_session=db).run(ctx)
+    assert not any(t.kind == "release_notes" for t in ctx.tasks)
+    db.close()
+```
+
+- [ ] **Step 2: Write the new failing tests**
+
+Add these 4 new tests to the same file:
+
+```python
+def test_analyzer_builds_issue_reply_task_for_new_issue(seed_user):
+    ctx, db = _ctx(seed_user, open_issues=[{"number": 42, "title": "Bug: crashes on startup", "body": "It crashes."}])
+    ctx = ContentAnalyzer(db_session=db).run(ctx)
+
+    issue_task = next(t for t in ctx.tasks if t.kind == "issue_reply")
+    assert issue_task.target == "issue:42"
+    assert issue_task.structured is False
+    assert issue_task.source_material == {"title": "Bug: crashes on startup", "body": "It crashes.", "repo_name": "hello-world"}
+    db.close()
+
+
+def test_analyzer_skips_issue_reply_task_when_draft_already_exists(seed_user):
+    ctx, db = _ctx(seed_user, open_issues=[{"number": 42, "title": "Bug", "body": "It crashes."}])
+    db.add(Draft(user_id=seed_user, repo_id=ctx.repo.id, kind="issue_reply", target="issue:42", content={}, status="rejected"))
+    db.commit()
+
+    ctx = ContentAnalyzer(db_session=db).run(ctx)
+
+    assert not any(t.kind == "issue_reply" for t in ctx.tasks)
+    db.close()
+
+
+def test_analyzer_builds_discussion_reply_task_for_new_discussion(seed_user):
+    ctx, db = _ctx(seed_user, discussions=[{"id": "D_kwDOABCD1", "number": 7, "title": "How do I configure X?", "body": "Trying to set up X."}])
+    ctx = ContentAnalyzer(db_session=db).run(ctx)
+
+    disc_task = next(t for t in ctx.tasks if t.kind == "discussion_reply")
+    assert disc_task.target == "discussion:7"
+    assert disc_task.source_material == {
+        "title": "How do I configure X?", "body": "Trying to set up X.", "repo_name": "hello-world",
+        "discussion_node_id": "D_kwDOABCD1",
+    }
+    db.close()
+
+
+def test_analyzer_skips_discussion_reply_task_when_draft_already_exists(seed_user):
+    ctx, db = _ctx(seed_user, discussions=[{"id": "D_kwDOABCD1", "number": 7, "title": "Q", "body": "B"}])
+    db.add(Draft(user_id=seed_user, repo_id=ctx.repo.id, kind="discussion_reply", target="discussion:7", content={}, status="posted"))
+    db.commit()
+
+    ctx = ContentAnalyzer(db_session=db).run(ctx)
+
+    assert not any(t.kind == "discussion_reply" for t in ctx.tasks)
+    db.close()
+```
+
+Add `from app.db import SessionLocal` and `from app.models import Draft` to the top of `test_content_analyzer.py` if not already present (check first — `Repo` is already imported).
+
+- [ ] **Step 3: Run tests to verify they fail**
+
+Run: `cd backend && .venv/bin/python -m pytest tests/test_content_analyzer.py -v`
+Expected: FAIL — `TypeError: ContentAnalyzer.__init__() missing 1 required positional argument: 'db_session'` on every test (since `ContentAnalyzer()` is called with no args in the not-yet-updated tests, and the new tests reference `issue_reply`/`discussion_reply` kinds that don't exist yet).
+
+- [ ] **Step 4: Implement the analyzer changes**
+
+In `backend/app/pipeline/content/analyzer.py`, replace the full file content:
+
+```python
+from sqlalchemy.orm import Session
+
+from app.models import Draft
+from app.pipeline.base import Stage
+from app.pipeline.content_base import ContentPipelineContext, ContentTask
+
+_MIN_TOPICS = 5
+
+
+class ContentAnalyzer(Stage):
+    name = "content_analyzer"
+
+    def __init__(self, db_session: Session):
+        self.db = db_session
+
+    def run(self, ctx: ContentPipelineContext) -> ContentPipelineContext:
+        raw = ctx.raw
+        topics = raw.get("topics", [])
+        tasks: list[ContentTask] = [
+            ContentTask(
+                kind="readme_suggestion",
+                target="readme",
+                structured=False,
+                current=raw.get("readme"),
+                source_material={"readme": raw.get("readme") or "", "topics": topics, "description": raw.get("description")},
+            ),
+        ]
+
+        for filename in raw.get("missing_docs", []):
+            tasks.append(ContentTask(
+                kind="missing_doc_suggestion",
+                target=filename,
+                structured=False,
+                current=None,
+                source_material={"filename": filename, "readme": raw.get("readme") or ""},
+            ))
+
+        if len(topics) < _MIN_TOPICS:
+            tasks.append(ContentTask(
+                kind="topic_suggestion",
+                target="topics",
+                structured=True,
+                current=topics,
+                source_material={"topics": topics, "readme": raw.get("readme") or "", "description": raw.get("description")},
+            ))
+
+        tasks.append(ContentTask(
+            kind="seo_suggestion",
+            target="description",
+            structured=True,
+            current=raw.get("description"),
+            source_material={"description": raw.get("description"), "readme": raw.get("readme") or "", "topics": topics},
+        ))
+
+        latest_release = raw.get("latest_release")
+        if latest_release and latest_release.get("tag_name") != ctx.repo.last_release_tag:
+            body = (latest_release.get("body") or "").strip()
+            if body:
+                tasks.append(ContentTask(
+                    kind="release_notes",
+                    target=latest_release["tag_name"],
+                    structured=False,
+                    current=None,
+                    source_material={"tag": latest_release["tag_name"], "raw_notes": body, "repo_name": ctx.repo.name},
+                ))
+
+        for issue in raw.get("open_issues", []):
+            target = f"issue:{issue['number']}"
+            if self._draft_exists(ctx.repo.id, "issue_reply", target):
+                continue
+            tasks.append(ContentTask(
+                kind="issue_reply",
+                target=target,
+                structured=False,
+                current=None,
+                source_material={"title": issue["title"], "body": issue.get("body") or "", "repo_name": ctx.repo.name},
+            ))
+
+        for disc in raw.get("discussions", []):
+            target = f"discussion:{disc['number']}"
+            if self._draft_exists(ctx.repo.id, "discussion_reply", target):
+                continue
+            tasks.append(ContentTask(
+                kind="discussion_reply",
+                target=target,
+                structured=False,
+                current=None,
+                source_material={
+                    "title": disc["title"], "body": disc.get("body") or "", "repo_name": ctx.repo.name,
+                    "discussion_node_id": disc["id"],
+                },
+            ))
+
+        ctx.tasks = tasks
+        return ctx
+
+    def _draft_exists(self, repo_id: int, kind: str, target: str) -> bool:
+        return self.db.query(Draft).filter_by(repo_id=repo_id, kind=kind, target=target).first() is not None
+```
+
+Then in `backend/app/pipeline/content_jobs.py`, update the one call site inside `build_content_stages`:
+
+```python
+def build_content_stages(db: Session, gh_client: GitHubClient, llm_router: LLMRouter) -> list:
+    return [
+        ContentExtractor(gh_client=gh_client),
+        ContentAnalyzer(db_session=db),
+        ContentPreprocessor(),
+        ContentOptimizer(),
+        ContentSynthesizer(llm_router=llm_router),
+        ContentValidator(llm_router=llm_router),
+        ContentAssembler(db_session=db),
+    ]
+```
+
+- [ ] **Step 5: Run tests to verify they pass**
+
+Run: `cd backend && .venv/bin/python -m pytest tests/test_content_analyzer.py -v`
+Expected: all 12 pass (8 updated + 4 new).
+
+Then run the full backend suite once: `cd backend && .venv/bin/python -m pytest -q` — expect all pass, no regressions (this confirms `content_jobs.py`'s call-site update didn't break `test_content_jobs.py`).
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add backend/app/pipeline/content/analyzer.py backend/app/pipeline/content_jobs.py backend/tests/test_content_analyzer.py
+git commit -m "feat(4f): ContentAnalyzer gains db_session, creates issue_reply/discussion_reply tasks with dedup"
+```
+
+---
+
+### Task 6: `ContentSynthesizer` gains `issue_reply`/`discussion_reply` prompts
+
+**Files:**
+- Modify: `backend/app/pipeline/content/synthesizer.py`
+- Test: `backend/tests/test_content_synthesizer.py`
+
+**Interfaces:**
+- Consumes: `ContentTask(kind="issue_reply"|"discussion_reply", source_material={"title", "body", "repo_name"[, "discussion_node_id"]})` (Task 5).
+- Produces: no new public interface — both kinds flow through the existing free-text path.
+
+- [ ] **Step 1: Write the failing test**
+
+Add to `backend/tests/test_content_synthesizer.py`:
+
+```python
+def test_synthesizer_builds_issue_reply_prompt():
+    task = ContentTask(
+        kind="issue_reply", target="issue:42", structured=False, current=None,
+        source_material={"title": "Bug: crashes on startup", "body": "It crashes.", "repo_name": "hello-world"},
+    )
+    ctx = _ctx_with_task(task)
+    llm = _fake_llm(["Thanks for the report! Can you share the full stack trace?"])
+
+    ctx = ContentSynthesizer(llm_router=llm).run(ctx)
+
+    assert ctx.tasks[0].candidates == ["Thanks for the report! Can you share the full stack trace?"]
+    sent_prompt = llm.chat_completion.call_args_list[0].args[0][1]["content"]
+    assert "hello-world" in sent_prompt
+    assert "Bug: crashes on startup" in sent_prompt
+    assert "It crashes." in sent_prompt
+
+
+def test_synthesizer_builds_discussion_reply_prompt():
+    task = ContentTask(
+        kind="discussion_reply", target="discussion:7", structured=False, current=None,
+        source_material={"title": "How do I configure X?", "body": "Trying to set up X.", "repo_name": "hello-world", "discussion_node_id": "D_kwDOABCD1"},
+    )
+    ctx = _ctx_with_task(task)
+    llm = _fake_llm(["Great question — check the config.yaml docs section."])
+
+    ctx = ContentSynthesizer(llm_router=llm).run(ctx)
+
+    assert ctx.tasks[0].candidates == ["Great question — check the config.yaml docs section."]
+    sent_prompt = llm.chat_completion.call_args_list[0].args[0][1]["content"]
+    assert "hello-world" in sent_prompt
+    assert "How do I configure X?" in sent_prompt
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `cd backend && .venv/bin/python -m pytest tests/test_content_synthesizer.py -v -k "issue_reply or discussion_reply"`
+Expected: FAIL — `KeyError: 'issue_reply'` from `_KIND_PROMPTS[task.kind]`.
+
+- [ ] **Step 3: Add the prompts and fields**
+
+In `backend/app/pipeline/content/synthesizer.py`, add two entries to `_KIND_PROMPTS` (after `"release_notes"`):
+
+```python
+    "issue_reply": (
+        "You are a helpful, friendly open-source maintainer replying to a new GitHub "
+        "issue on {repo_name}. Write a considerate, helpful reply — ask for missing "
+        "details if the issue is unclear, or offer initial guidance if the problem is "
+        "clear. Do not make promises about timelines or commit to specific fixes. "
+        "Respond with the reply text only, no commentary.\n\n"
+        "Issue title: {title}\nIssue body:\n{body}"
+    ),
+    "discussion_reply": (
+        "You are a helpful, friendly open-source maintainer replying to a new GitHub "
+        "Discussion on {repo_name}. Write a considerate, helpful reply engaging with "
+        "what was asked or discussed. Do not make promises about timelines or commit "
+        "to specific fixes. Respond with the reply text only, no commentary.\n\n"
+        "Discussion title: {title}\nDiscussion body:\n{body}"
+    ),
+```
+
+Update `_build_prompt`'s `fields` dict to add `"title"` and `"body"` (full updated method):
+
+```python
+    def _build_prompt(self, task: ContentTask) -> str:
+        fields = {
+            "readme": task.source_material.get("readme") or "",
+            "topics": task.source_material.get("topics") or [],
+            "description": task.source_material.get("description") or "",
+            "filename": task.source_material.get("filename", ""),
+            "repo_name": task.source_material.get("repo_name", ""),
+            "tag": task.source_material.get("tag", ""),
+            "raw_notes": task.source_material.get("raw_notes", ""),
+            "title": task.source_material.get("title", ""),
+            "body": task.source_material.get("body", ""),
+        }
+        return _KIND_PROMPTS[task.kind].format(**fields)
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `cd backend && .venv/bin/python -m pytest tests/test_content_synthesizer.py -v`
+Expected: all pass, including the 2 new tests, no regressions.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add backend/app/pipeline/content/synthesizer.py backend/tests/test_content_synthesizer.py
+git commit -m "feat(4f): ContentSynthesizer gains issue_reply/discussion_reply prompts"
+```
+
+---
+
+### Task 7: `ContentAssembler` writes `issue_reply`/`discussion_reply` content shapes
+
+**Files:**
+- Modify: `backend/app/pipeline/content/assembler.py`
+- Test: `backend/tests/test_content_assembler.py`
+
+**Interfaces:**
+- Consumes: valid `issue_reply`/`discussion_reply` `ContentTask`s (Tasks 5, 6).
+- Produces: `Draft(kind="issue_reply", content={"suggested", "reason"})`; `Draft(kind="discussion_reply", content={"suggested", "reason", "discussion_node_id"})`.
+
+- [ ] **Step 1: Write the failing tests**
+
+Add to `backend/tests/test_content_assembler.py`:
+
+```python
+def test_assembler_writes_issue_reply_draft(seed_user):
+    db, repo = _db_and_repo(seed_user)
+    ctx = ContentPipelineContext(repo=repo)
+    ctx.tasks = [
+        ContentTask(kind="issue_reply", target="issue:42", structured=False, current=None, winner="Thanks for the report!", winner_reason="acknowledges and asks for details", valid=True),
+    ]
+
+    ctx = ContentAssembler(db_session=db).run(ctx)
+
+    draft = db.query(Draft).filter_by(repo_id=repo.id, kind="issue_reply").one()
+    assert draft.target == "issue:42"
+    assert draft.content == {"suggested": "Thanks for the report!", "reason": "acknowledges and asks for details"}
+    db.close()
+
+
+def test_assembler_writes_discussion_reply_draft_with_node_id(seed_user):
+    db, repo = _db_and_repo(seed_user)
+    ctx = ContentPipelineContext(repo=repo)
+    ctx.tasks = [
+        ContentTask(
+            kind="discussion_reply", target="discussion:7", structured=False, current=None,
+            winner="Great question!", winner_reason="directly answers", valid=True,
+            source_material={"discussion_node_id": "D_kwDOABCD1"},
+        ),
+    ]
+
+    ctx = ContentAssembler(db_session=db).run(ctx)
+
+    draft = db.query(Draft).filter_by(repo_id=repo.id, kind="discussion_reply").one()
+    assert draft.target == "discussion:7"
+    assert draft.content == {"suggested": "Great question!", "reason": "directly answers", "discussion_node_id": "D_kwDOABCD1"}
+    db.close()
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `cd backend && .venv/bin/python -m pytest tests/test_content_assembler.py -v -k "issue_reply or discussion_reply"`
+Expected: FAIL — `draft.content` will be `{"current": None, "suggested": ..., "reason": ...}` (falls through to the generic branch) instead of the expected shapes.
+
+- [ ] **Step 3: Implement the content-shape routing**
+
+In `backend/app/pipeline/content/assembler.py`, update `_content_for` (full updated method):
+
+```python
+    def _content_for(self, task: ContentTask) -> dict:
+        if task.kind == "seo_suggestion":
+            return {
+                "current": task.current,
+                "suggested_description": task.winner["description"],
+                "keywords": task.winner["keywords"],
+                "reason": task.winner_reason,
+            }
+        if task.kind == "discussion_reply":
+            return {
+                "suggested": task.winner,
+                "reason": task.winner_reason,
+                "discussion_node_id": task.source_material["discussion_node_id"],
+            }
+        if task.kind in ("missing_doc_suggestion", "release_notes", "issue_reply"):
+            return {"suggested": task.winner, "reason": task.winner_reason}
+        return {"current": task.current, "suggested": task.winner, "reason": task.winner_reason}
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `cd backend && .venv/bin/python -m pytest tests/test_content_assembler.py -v`
+Expected: all pass, including the 2 new tests, no regressions.
+
+Then run the full backend suite once: `cd backend && .venv/bin/python -m pytest -q` — expect all pass, pristine output.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add backend/app/pipeline/content/assembler.py backend/tests/test_content_assembler.py
+git commit -m "feat(4f): ContentAssembler writes issue_reply/discussion_reply Drafts"
+```
+
+---
+
+### Task 8: `drafts.py` on-approve dispatch — the first Draft-triggered external action
+
+**Files:**
+- Modify: `backend/app/api/drafts.py`
+- Test: `backend/tests/test_drafts_api.py`
+
+**Interfaces:**
+- Consumes: `GitHubClient.create_issue_comment`/`create_discussion_comment` (Task 3), `Draft.error_message` (Task 1).
+- Produces: `PATCH /drafts/{id}` with `status=approved` on an `issue_reply`/`discussion_reply` Draft synchronously posts to GitHub and returns `status="posted"` or `status="failed"` (with `error_message` set). Every other kind's approve is unaffected.
+
+- [ ] **Step 1: Write the failing tests**
+
+Add to `backend/tests/test_drafts_api.py`. First add a helper for seeding an `issue_reply`/`discussion_reply` draft (alongside the existing `_seed_draft_for`):
+
+```python
+def _seed_reply_draft(user_id: int, kind: str, target: str, content: dict) -> tuple[int, int]:
+    db = SessionLocal()
+    repo = Repo(owner="octocat", name="hello-world", user_id=user_id)
+    db.add(repo)
+    db.commit()
+    db.refresh(repo)
+
+    draft = Draft(user_id=user_id, repo_id=repo.id, kind=kind, target=target, content=content, status="pending")
+    db.add(draft)
+    db.commit()
+    db.refresh(draft)
+    repo_id, draft_id = repo.id, draft.id
+    db.close()
+    return repo_id, draft_id
+```
+
+Then add these tests:
+
+```python
+@patch("app.api.drafts.GitHubClient")
+def test_approve_issue_reply_posts_comment_and_marks_posted(mock_gh_cls, client):
+    mock_gh = MagicMock()
+    mock_gh.create_issue_comment.return_value = {"id": 999}
+    mock_gh_cls.return_value = mock_gh
+
+    _repo_id, draft_id = _seed_reply_draft(
+        client.test_user_id, "issue_reply", "issue:42", {"suggested": "Thanks for the report!", "reason": "acknowledges"},
+    )
+
+    resp = client.patch(f"/drafts/{draft_id}", json={"status": "approved"})
+
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "posted"
+    mock_gh.create_issue_comment.assert_called_once_with("octocat", "hello-world", 42, "Thanks for the report!")
+
+
+@patch("app.api.drafts.GitHubClient")
+def test_approve_discussion_reply_posts_comment_and_marks_posted(mock_gh_cls, client):
+    mock_gh = MagicMock()
+    mock_gh.create_discussion_comment.return_value = {"data": {}}
+    mock_gh_cls.return_value = mock_gh
+
+    _repo_id, draft_id = _seed_reply_draft(
+        client.test_user_id, "discussion_reply", "discussion:7",
+        {"suggested": "Great question!", "reason": "directly answers", "discussion_node_id": "D_kwDOABCD1"},
+    )
+
+    resp = client.patch(f"/drafts/{draft_id}", json={"status": "approved"})
+
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "posted"
+    mock_gh.create_discussion_comment.assert_called_once_with("D_kwDOABCD1", "Great question!")
+
+
+@patch("app.api.drafts.GitHubClient")
+def test_approve_issue_reply_marks_failed_on_posting_error(mock_gh_cls, client):
+    mock_gh = MagicMock()
+    mock_gh.create_issue_comment.side_effect = RuntimeError("GitHub API unavailable")
+    mock_gh_cls.return_value = mock_gh
+
+    _repo_id, draft_id = _seed_reply_draft(
+        client.test_user_id, "issue_reply", "issue:42", {"suggested": "Thanks!", "reason": "ack"},
+    )
+
+    resp = client.patch(f"/drafts/{draft_id}", json={"status": "approved"})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "failed"
+    assert body["error_message"] == "GitHub API unavailable"
+
+
+@patch("app.api.drafts.GitHubClient")
+def test_reject_issue_reply_never_posts(mock_gh_cls, client):
+    mock_gh = MagicMock()
+    mock_gh_cls.return_value = mock_gh
+
+    _repo_id, draft_id = _seed_reply_draft(
+        client.test_user_id, "issue_reply", "issue:42", {"suggested": "Thanks!", "reason": "ack"},
+    )
+
+    resp = client.patch(f"/drafts/{draft_id}", json={"status": "rejected"})
+
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "rejected"
+    mock_gh.create_issue_comment.assert_not_called()
+```
+
+Add `MagicMock` (alongside the existing `patch` import) and `GitHubClient` is NOT imported in the test file directly — it's patched by string path (`"app.api.drafts.GitHubClient"`), matching the existing `@patch("app.api.drafts.broadcaster.publish")` convention already in this file.
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `cd backend && .venv/bin/python -m pytest tests/test_drafts_api.py -v -k "posts_comment or marks_failed or never_posts"`
+Expected: FAIL — approving currently just sets `status="approved"`, never calls `GitHubClient`, and `error_message` doesn't exist on the response yet.
+
+- [ ] **Step 3: Implement the dispatch**
+
+Replace the full content of `backend/app/api/drafts.py`:
+
+```python
+from datetime import datetime
+from typing import Literal
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.db import get_db
+from app.deps import require_api_key, require_user
+from app.events import broadcaster
+from app.github_client import GitHubClient
+from app.models import Draft, Repo, User
+from app.token_crypto import decrypt_token
+
+router = APIRouter(prefix="/drafts", tags=["drafts"], dependencies=[Depends(require_api_key)])
+
+
+class DraftOut(BaseModel):
+    id: int
+    repo_id: int | None
+    kind: str
+    target: str
+    content: dict
+    status: str
+    error_message: str | None
+    created_at: datetime
+    reviewed_at: datetime | None
+
+    model_config = {"from_attributes": True}
+
+
+class DraftPatch(BaseModel):
+    status: Literal["approved", "rejected"]
+
+
+@router.get("", response_model=list[DraftOut])
+def list_drafts(db: Session = Depends(get_db), current_user: User = Depends(require_user)) -> list[Draft]:
+    return db.execute(
+        select(Draft).where(Draft.user_id == current_user.id).order_by(Draft.created_at.desc())
+    ).scalars().all()
+
+
+@router.patch("/{draft_id}", response_model=DraftOut)
+def review_draft(
+    draft_id: int,
+    payload: DraftPatch,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+) -> Draft:
+    draft = db.execute(
+        select(Draft).where(Draft.id == draft_id, Draft.user_id == current_user.id)
+    ).scalars().first()
+    if draft is None:
+        raise HTTPException(status_code=404, detail="Draft not found")
+    if draft.status != "pending":
+        raise HTTPException(status_code=409, detail="Draft has already been reviewed")
+
+    draft.status = payload.status
+    draft.reviewed_at = datetime.now(draft.created_at.tzinfo)
+
+    if payload.status == "approved" and draft.kind in ("issue_reply", "discussion_reply"):
+        _post_reply(draft, current_user, db)
+
+    db.commit()
+    db.refresh(draft)
+    broadcaster.publish("draft_updated", {"id": draft.id, "status": draft.status}, user_id=current_user.id)
+    return draft
+
+
+def _post_reply(draft: Draft, current_user: User, db: Session) -> None:
+    repo = db.get(Repo, draft.repo_id)
+    try:
+        gh_client = GitHubClient(token=decrypt_token(current_user.access_token_encrypted))
+        if draft.kind == "issue_reply":
+            issue_number = int(draft.target.removeprefix("issue:"))
+            gh_client.create_issue_comment(repo.owner, repo.name, issue_number, draft.content["suggested"])
+        else:
+            gh_client.create_discussion_comment(draft.content["discussion_node_id"], draft.content["suggested"])
+        draft.status = "posted"
+    except Exception as exc:
+        draft.status = "failed"
+        draft.error_message = str(exc)
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `cd backend && .venv/bin/python -m pytest tests/test_drafts_api.py -v`
+Expected: all pass, including the 4 new tests, no regressions to the existing `test_approve_draft`/`test_reject_draft`/`test_patch_already_reviewed_draft_returns_409` tests (these use `kind="readme_suggestion"`, so the new `if` branch never triggers for them — confirm this explicitly).
+
+Then run the full backend suite once: `cd backend && .venv/bin/python -m pytest -q` — expect all pass, `pip-audit` clean.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add backend/app/api/drafts.py backend/tests/test_drafts_api.py
+git commit -m "feat(4f): drafts.py on-approve dispatch posts issue/discussion replies to GitHub"
+```
+
+---
+
+### Task 9: Frontend types, labels, and posted/failed toast handling
+
+**Files:**
+- Modify: `frontend/types/drafts.ts`
+- Modify: `frontend/components/drafts/drafts-client.tsx`
+- Test: `frontend/tests/drafts-client.test.tsx` (extend, created in Phase 4C)
+
+**Interfaces:**
+- Produces: `DraftKind` includes `"issue_reply"`, `"discussion_reply"`; `IssueReplyContent`, `DiscussionReplyContent` types; `DRAFT_KIND_LABELS` entries; approve-button toast branching on the returned Draft's `status`.
+
+- [ ] **Step 1: Regenerate OpenAPI types**
+
+Start the local backend (`.venv/bin/uvicorn app.main:app --reload` from `backend/`), then from `frontend/`: `npm run generate:types`. Confirm with `grep -n "error_message" frontend/types/api.d.ts` — expect a match on `DraftOut`. Stop the backend afterward.
+
+- [ ] **Step 2: Write the failing test**
+
+Add to `frontend/tests/drafts-client.test.tsx` (read the existing file first — created in Phase 4C — to match its exact mocking convention):
+
+```tsx
+describe("DraftsClient approve toast behavior", () => {
+  it("shows a success toast when approving results in status posted", () => {
+    const mutate = vi.fn((_vars, opts) => opts?.onSuccess?.({ id: 1, status: "posted", error_message: null }));
+    mockHooksWithReview([{ ...baseDraft, kind: "issue_reply", target: "issue:42", content: { suggested: "Thanks!", reason: "ack" } }], mutate);
+    render(<DraftsClient />);
+    fireEvent.click(screen.getAllByRole("button", { name: /approve/i })[0]);
+    expect(mockToastSuccess).toHaveBeenCalledWith(expect.stringMatching(/posted/i));
+  });
+
+  it("shows an error toast with the failure reason when approving results in status failed", () => {
+    const mutate = vi.fn((_vars, opts) => opts?.onSuccess?.({ id: 1, status: "failed", error_message: "GitHub API unavailable" }));
+    mockHooksWithReview([{ ...baseDraft, kind: "issue_reply", target: "issue:42", content: { suggested: "Thanks!", reason: "ack" } }], mutate);
+    render(<DraftsClient />);
+    fireEvent.click(screen.getAllByRole("button", { name: /approve/i })[0]);
+    expect(mockToastError).toHaveBeenCalledWith(expect.stringContaining("GitHub API unavailable"));
+  });
+
+  it("shows no posted/failed toast for a non-posting kind like readme_suggestion", () => {
+    const mutate = vi.fn((_vars, opts) => opts?.onSuccess?.({ id: 1, status: "approved", error_message: null }));
+    mockHooksWithReview([{ ...baseDraft, kind: "readme_suggestion", target: "readme", content: { current: null, suggested: "# New", reason: null } }], mutate);
+    render(<DraftsClient />);
+    fireEvent.click(screen.getAllByRole("button", { name: /approve/i })[0]);
+    expect(mockToastSuccess).not.toHaveBeenCalled();
+    expect(mockToastError).not.toHaveBeenCalled();
+  });
+});
+```
+
+Read the existing `drafts-client.test.tsx` file (from Phase 4C) to see its exact `baseDraft`/`mockHooks` helper shapes and its `sonner` mocking convention (check whether `toast.success`/`toast.error` are already mocked via `vi.mock("sonner", ...)` somewhere in this codebase's test setup — if so, reference those existing mock function names, e.g. `mockToastSuccess`/`mockToastError`, instead of inventing new ones; if not already mocked, add a `vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }))` at the top of this file and import `toast` from `"sonner"` to assert on `toast.success`/`toast.error` directly). Adjust the test's exact mock wiring (`mockHooksWithReview`) to match how `useReviewDraft`'s `mutate` is actually invoked in `drafts-client.tsx` — read that file's current approve-button `onClick` before writing the exact mock shape.
+
+- [ ] **Step 3: Run test to verify it fails**
+
+Run: `cd frontend && npx vitest run tests/drafts-client.test.tsx -t "approve toast"`
+Expected: FAIL — no `onSuccess` toast branch exists yet on the approve button.
+
+- [ ] **Step 4: Add the types and labels**
+
+In `frontend/types/drafts.ts`, add:
+
+```ts
+export type IssueReplyContent = MissingDocSuggestionContent;
+
+export interface DiscussionReplyContent extends MissingDocSuggestionContent {
+  discussion_node_id: string;
+}
+```
+
+Update `DraftKind`:
+
+```ts
+export type DraftKind =
+  | "readme_suggestion"
+  | "missing_doc_suggestion"
+  | "topic_suggestion"
+  | "seo_suggestion"
+  | "release_notes"
+  | "issue_reply"
+  | "discussion_reply";
+```
+
+In `frontend/components/drafts/drafts-client.tsx`, update `DRAFT_KIND_LABELS`:
+
+```ts
+const DRAFT_KIND_LABELS: Record<string, string> = {
+  readme_suggestion: "README suggestion",
+  missing_doc_suggestion: "Missing doc",
+  topic_suggestion: "Topic suggestion",
+  seo_suggestion: "SEO suggestion",
+  release_notes: "Release notes",
+  issue_reply: "Issue reply",
+  discussion_reply: "Discussion reply",
+} satisfies Record<DraftKind, string>;
+```
+
+- [ ] **Step 5: Add the toast branching**
+
+In `frontend/components/drafts/drafts-client.tsx`, find the approve button's `onClick` (currently something like `review.mutate({ id: draft.id, status: "approved" }, { onError: () => toast.error(...) })`). Update it to also branch on the response's `status` in `onSuccess`:
+
+```tsx
+onClick={() =>
+  review.mutate(
+    { id: draft.id, status: "approved" },
+    {
+      onSuccess: (updated) => {
+        if (updated.status === "posted") {
+          toast.success("Reply posted to GitHub");
+        } else if (updated.status === "failed") {
+          toast.error(`Could not post: ${updated.error_message}`);
+        }
+      },
+      onError: () => toast.error("Could not approve — try again."),
+    },
+  )
+}
+```
+
+(Every other existing Draft kind's `PATCH` response always has `status === "approved"`, never `"posted"`/`"failed"`, so this new branch is a silent no-op for them — no behavior change for existing kinds.)
+
+- [ ] **Step 6: Run test to verify it passes**
+
+Run: `cd frontend && npx vitest run tests/drafts-client.test.tsx`
+Expected: all pass, including the 3 new tests, no regressions.
+
+Then: `cd frontend && npx tsc --noEmit && npx eslint .` — expect clean.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add frontend/types/api.d.ts frontend/types/drafts.ts frontend/components/drafts/drafts-client.tsx frontend/tests/drafts-client.test.tsx
+git commit -m "feat(4f): add issue_reply/discussion_reply DraftKind, labels, posted/failed toast handling"
+```
+
+---
+
+### Task 10: `DraftContent` renders `issue_reply`/`discussion_reply`
+
+**Files:**
+- Modify: `frontend/components/drafts/draft-content.tsx`
+- Test: `frontend/tests/draft-content.test.tsx`
+
+**Interfaces:**
+- Consumes: `IssueReplyContent`, `DiscussionReplyContent` types (Task 9).
+- Produces: `DraftContent` renders both new kinds.
+
+- [ ] **Step 1: Write the failing tests**
+
+Add to `frontend/tests/draft-content.test.tsx`, inside the existing `describe("DraftContent", ...)` block, after the `release_notes` test:
+
+```tsx
+  it("renders suggested text and reason for issue_reply", () => {
+    render(<DraftContent kind="issue_reply" content={{ suggested: "Thanks for the report! Can you share more details?", reason: "acknowledges and asks for details" }} />);
+    expect(screen.getByText(/Thanks for the report/)).toBeInTheDocument();
+    expect(screen.getByText("acknowledges and asks for details")).toBeInTheDocument();
+  });
+
+  it("renders suggested text and reason for discussion_reply", () => {
+    render(<DraftContent kind="discussion_reply" content={{ suggested: "Great question — check the docs.", reason: "directly answers", discussion_node_id: "D_kwDOABCD1" }} />);
+    expect(screen.getByText(/Great question/)).toBeInTheDocument();
+    expect(screen.getByText("directly answers")).toBeInTheDocument();
+  });
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `cd frontend && npx vitest run tests/draft-content.test.tsx -t "issue_reply or discussion_reply"`
+Expected: FAIL — falls through to the `JSON.stringify` fallback branch.
+
+- [ ] **Step 3: Add the two branches**
+
+In `frontend/components/drafts/draft-content.tsx`, add two new branches immediately after the existing `release_notes` block:
+
+```tsx
+  if (kind === "issue_reply" && isMissingDocSuggestion(content)) {
+    return (
+      <div>
+        <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-md bg-muted/50 p-2 text-xs">{content.suggested}</pre>
+        <Reason reason={content.reason} />
+      </div>
+    );
+  }
+
+  if (kind === "discussion_reply" && isMissingDocSuggestion(content)) {
+    return (
+      <div>
+        <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-md bg-muted/50 p-2 text-xs">{content.suggested}</pre>
+        <Reason reason={content.reason} />
+      </div>
+    );
+  }
+```
+
+(Both reuse `isMissingDocSuggestion` as the type guard since `IssueReplyContent`/`DiscussionReplyContent` share the identical `{suggested, reason}` core shape — `DiscussionReplyContent`'s extra `discussion_node_id` field isn't rendered, only needed server-side to actually post the reply. Matches the file's existing convention of one explicit branch per `kind` even when several kinds share a shape.)
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `cd frontend && npx vitest run tests/draft-content.test.tsx`
+Expected: all pass, including the 2 new tests, no regressions.
+
+Then the full frontend verification (this is the final task in the plan):
+
+Run: `cd frontend && npx tsc --noEmit && npx eslint . && npx vitest run && npx next build`
+Expected: all clean.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add frontend/components/drafts/draft-content.tsx frontend/tests/draft-content.test.tsx
+git commit -m "feat(4f): DraftContent renders issue_reply/discussion_reply drafts"
+```
+
+---
+
+## Final whole-branch review
+
+After all 10 tasks: dispatch a final whole-branch code reviewer (opus, per this project's established pattern) covering the full diff since this plan's first commit. Confirm: backend full suite passes with no warnings, `pip-audit` clean; frontend `tsc`/`eslint`/`vitest`/`next build` all clean; `create_issue_comment`/`create_discussion_comment` are genuinely called ONLY from `app/api/drafts.py`, never from any pipeline stage (grep the whole diff for both method names); the dedup-by-existing-Draft check in `ContentAnalyzer` genuinely prevents re-drafting an issue/discussion that already has any Draft, regardless of status; rejecting a Draft never posts anything, for any kind; every pre-existing Draft kind's approve behavior is provably unaffected (still ends in `"approved"`, no posting attempted, no new toast shown). Then update `.agile-v/REQUIREMENTS.md` (new REQ), `.agile-v/STATE.md`, `docs/PROJECT_PLAN.md` (mark 4F done), and `docs/PROJECT_WALKTHROUGH.md` before the Product Owner's Gate 2 review — same sequence as every prior sub-project.
