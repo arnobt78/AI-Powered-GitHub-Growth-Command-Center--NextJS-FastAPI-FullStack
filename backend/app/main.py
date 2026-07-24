@@ -23,6 +23,7 @@ from app.db import SessionLocal
 from app.pipeline.jobs import run_pipeline_for_all_repos
 from app.pipeline.content_jobs import run_content_pipeline_for_all_repos
 from app.pipeline.opportunity_jobs import run_opportunities_pipeline_for_all_repos
+from app.demo_asset_jobs import cleanup_expired_demo_assets
 
 settings = get_settings()
 
@@ -53,6 +54,14 @@ def _scheduled_opportunities_run() -> None:
         db.close()
 
 
+def _scheduled_demo_asset_cleanup() -> None:
+    db = SessionLocal()
+    try:
+        cleanup_expired_demo_assets(db)
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     scheduler.add_job(_scheduled_pipeline_run, "interval", hours=24, id="daily_pipeline_run")
@@ -74,6 +83,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         hours=24,
         id="daily_opportunities_run",
         next_run_time=datetime.now() + timedelta(hours=18),
+    )
+    # Cheap filesystem/DB cleanup, not an external API call, so it doesn't
+    # need the same rate-limit-avoiding stagger as the other three — run it
+    # once daily, offset by 1 hour from startup so it doesn't compete with
+    # the other jobs' startup-time initialization.
+    scheduler.add_job(
+        _scheduled_demo_asset_cleanup,
+        "interval",
+        hours=24,
+        id="daily_demo_asset_cleanup",
+        next_run_time=datetime.now() + timedelta(hours=1),
     )
     scheduler.start()
     yield

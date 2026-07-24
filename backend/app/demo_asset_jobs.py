@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
@@ -28,3 +29,16 @@ def generate_demo_asset(db: Session, demo_asset_id: int, urls: list[str]) -> Non
 
     db.commit()
     broadcaster.publish("demo_asset_updated", {"id": asset.id, "status": asset.status}, user_id=asset.user_id)
+
+
+def cleanup_expired_demo_assets(db: Session) -> None:
+    settings = get_settings()
+    cutoff = datetime.now(timezone.utc) - timedelta(days=settings.demo_asset_retention_days)
+    expired = db.query(DemoAsset).filter(DemoAsset.created_at < cutoff).all()
+    for asset in expired:
+        if asset.video_path:
+            full_path = os.path.join(settings.demo_assets_dir, asset.video_path)
+            if os.path.exists(full_path):
+                os.remove(full_path)
+        db.delete(asset)
+    db.commit()
