@@ -172,6 +172,19 @@ class Draft(Base):
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
+class DemoAsset(Base):
+    __tablename__ = "demo_assets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    repo_id: Mapped[int] = mapped_column(ForeignKey("repos.id", ondelete="CASCADE"))
+    status: Mapped[str] = mapped_column(String(50), default="generating")
+    # Filename relative to settings.demo_assets_dir, null until status="ready".
+    video_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
 class Opportunity(Base):
     __tablename__ = "opportunities"
 

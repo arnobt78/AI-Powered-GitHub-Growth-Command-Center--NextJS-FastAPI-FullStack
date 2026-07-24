@@ -1,5 +1,5 @@
 from app.db import Base, engine, SessionLocal
-from app.models import Repo, User, Opportunity, Draft
+from app.models import Repo, User, Opportunity, Draft, DemoAsset
 
 
 def test_create_and_query_repo(seed_user):
@@ -168,4 +168,41 @@ def test_draft_error_message_defaults_none_and_is_settable():
     db.refresh(draft)
 
     assert draft.error_message == "GitHub token rejected"
+    db.close()
+
+
+def test_create_demo_asset_defaults_and_persistence():
+    db = SessionLocal()
+    user = User(
+        github_id="777",
+        username="demo-tester",
+        avatar_url="https://avatars.githubusercontent.com/u/777",
+        email=None,
+        access_token_encrypted="ciphertext-placeholder",
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    repo = Repo(owner="octocat", name="hello-world", user_id=user.id)
+    db.add(repo)
+    db.commit()
+    db.refresh(repo)
+
+    asset = DemoAsset(user_id=user.id, repo_id=repo.id)
+    db.add(asset)
+    db.commit()
+    db.refresh(asset)
+
+    assert asset.status == "generating"
+    assert asset.video_path is None
+    assert asset.error_message is None
+    assert asset.created_at is not None
+
+    asset.status = "ready"
+    asset.video_path = "42.mp4"
+    db.commit()
+    db.refresh(asset)
+
+    assert asset.video_path == "42.mp4"
     db.close()
