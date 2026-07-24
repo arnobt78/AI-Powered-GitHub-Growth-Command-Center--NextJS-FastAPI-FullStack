@@ -28,10 +28,21 @@ def mock_transport():
                 {"tag_name": "v1.2.0", "body": "- Added dark mode\n- Fixed crash on startup", "published_at": "2026-07-20T00:00:00Z"},
                 {"tag_name": "v1.1.0", "body": "- Initial release", "published_at": "2026-06-01T00:00:00Z"},
             ])
+        if request.url.path == "/repos/octocat/hello-world/issues":
+            return httpx.Response(200, json=[
+                {"number": 42, "title": "Bug: crashes on startup", "body": "It crashes."},
+                {"number": 41, "title": "PR: fix typo", "body": "Fixes a typo.", "pull_request": {"url": "https://api.github.com/..."}},
+            ])
         if request.url.path == "/graphql" and request.method == "POST":
             body = request.read()
             import json as json_module
             payload = json_module.loads(body)
+            if "discussions(" in payload["query"]:
+                return httpx.Response(200, json={
+                    "data": {"repository": {"discussions": {"nodes": [
+                        {"id": "D_kwDOABCD1", "number": 7, "title": "How do I configure X?", "body": "Trying to set up X.", "url": "https://github.com/octocat/hello-world/discussions/7"},
+                    ]}}}
+                })
             if "hello-world" in payload["variables"]["searchQuery"]:
                 return httpx.Response(200, json={
                     "data": {
@@ -165,3 +176,37 @@ def test_search_discussions_handles_null_search_from_graphql_partial_error():
 
     nodes = client.search_discussions("test-query")
     assert nodes == []
+
+
+def test_list_repo_issues_excludes_pull_requests(gh_client):
+    issues = gh_client.list_repo_issues("octocat", "hello-world")
+    assert len(issues) == 1
+    assert issues[0]["number"] == 42
+    assert issues[0]["title"] == "Bug: crashes on startup"
+
+
+def test_list_repo_discussions_returns_nodes(gh_client):
+    discussions = gh_client.list_repo_discussions("octocat", "hello-world")
+    assert discussions[0]["number"] == 7
+    assert discussions[0]["id"] == "D_kwDOABCD1"
+
+
+def test_list_repo_discussions_null_safe_on_partial_error():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"data": {"repository": None}})
+
+    http = httpx.Client(base_url="https://api.github.com", transport=httpx.MockTransport(handler))
+    client = GitHubClient(token="fake-token", http_client=http)
+
+    assert client.list_repo_discussions("octocat", "hello-world") == []
+
+
+def test_list_repo_discussions_raises_needs_reauth_on_401():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(401)
+
+    http = httpx.Client(base_url="https://api.github.com", transport=httpx.MockTransport(handler))
+    client = GitHubClient(token="fake-token", http_client=http)
+
+    with pytest.raises(GitHubAuthError):
+        client.list_repo_discussions("octocat", "hello-world")

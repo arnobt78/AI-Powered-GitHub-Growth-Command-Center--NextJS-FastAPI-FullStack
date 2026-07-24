@@ -80,6 +80,37 @@ class GitHubClient:
     def list_releases(self, owner: str, name: str, limit: int = 2) -> list[dict]:
         return self._get(f"/repos/{owner}/{name}/releases", params={"per_page": limit}).json()
 
+    def list_repo_issues(self, owner: str, name: str, limit: int = 20) -> list[dict]:
+        """Open issues only, newest first, PRs excluded — GitHub's issues
+        endpoint returns PRs as a subtype (each carries a 'pull_request' key)."""
+        resp = self._get(
+            f"/repos/{owner}/{name}/issues",
+            params={"state": "open", "sort": "created", "direction": "desc", "per_page": limit},
+        )
+        return [issue for issue in resp.json() if "pull_request" not in issue]
+
+    def list_repo_discussions(self, owner: str, name: str, limit: int = 10) -> list[dict]:
+        graphql_query = """
+        query($owner: String!, $name: String!, $limit: Int!) {
+          repository(owner: $owner, name: $name) {
+            discussions(first: $limit, orderBy: {field: CREATED_AT, direction: DESC}) {
+              nodes { id number title body url }
+            }
+          }
+        }
+        """
+        resp = self._http.post(
+            "/graphql",
+            json={"query": graphql_query, "variables": {"owner": owner, "name": name, "limit": limit}},
+        )
+        if resp.status_code == 401:
+            raise GitHubAuthError(f"needs_reauth: GitHub token rejected listing discussions for {owner}/{name}")
+        resp.raise_for_status()
+        data = resp.json().get("data") or {}
+        repo = data.get("repository") or {}
+        discussions = repo.get("discussions") or {}
+        return discussions.get("nodes") or []
+
     def search_discussions(self, query: str, limit: int = 5) -> list[dict]:
         graphql_query = """
         query($searchQuery: String!, $limit: Int!) {
