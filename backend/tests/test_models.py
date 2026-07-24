@@ -1,5 +1,5 @@
 from app.db import Base, engine, SessionLocal
-from app.models import Repo, User
+from app.models import Repo, User, Opportunity
 
 
 def test_create_and_query_repo(seed_user):
@@ -93,4 +93,43 @@ def test_repo_last_release_tag_defaults_none_and_is_settable():
     db.refresh(repo)
 
     assert repo.last_release_tag == "v1.2.0"
+    db.close()
+
+
+def test_create_opportunity_scoped_to_repo_and_user():
+    db = SessionLocal()
+    user = User(
+        github_id="888",
+        username="opp-tester",
+        avatar_url="https://avatars.githubusercontent.com/u/888",
+        email=None,
+        access_token_encrypted="ciphertext-placeholder",
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    repo = Repo(owner="octocat", name="hello-world", user_id=user.id)
+    db.add(repo)
+    db.commit()
+    db.refresh(repo)
+
+    opportunity = Opportunity(
+        user_id=user.id,
+        repo_id=repo.id,
+        source="hacker_news",
+        external_id="12345",
+        title="Show HN: hello-world",
+        url="https://news.ycombinator.com/item?id=12345",
+    )
+    db.add(opportunity)
+    db.commit()
+    db.refresh(opportunity)
+
+    assert opportunity.dismissed is False
+    assert opportunity.created_at is not None
+
+    fetched = db.query(Opportunity).filter_by(repo_id=repo.id).one()
+    assert fetched.source == "hacker_news"
+    assert fetched.external_id == "12345"
     db.close()
