@@ -20,13 +20,15 @@ const EVENT_QUERY_MAP: Record<string, QueryKey[]> = {
   opportunities_generated: [queryKeys.opportunities.all, queryKeys.runs.all],
   opportunity_updated: [queryKeys.opportunities.all],
   // Payload only carries {id, status} where id is the demo asset id, not a repo_id
-  // (see backend app/demo_asset_jobs.py) — there's no repoId to build a scoped
-  // ["repos", repoId, "demo-assets"] key from, and falling back to a broad
-  // queryKeys.repos.all prefix match would over-invalidate every other repo-scoped
-  // query (snapshots, insights, benchmarks, ...) for every repo just to catch demo
-  // assets. useTriggerDemoAsset's own onSuccess already invalidates the triggering
-  // tab; cross-tab refresh for other tabs viewing the same repo is left as a
-  // nice-to-have, not wired here.
+  // (see backend app/demo_asset_jobs.py), so we can't target one repo's scoped
+  // ["repos", repoId, "demo-assets"] key. Video generation runs as a background
+  // job that can take many seconds — useTriggerDemoAsset's onSuccess fires on the
+  // 202 response, before the job finishes, so this SSE event is the only signal
+  // that status actually changed to ready/failed. Under-invalidating here means
+  // the UI silently never updates without a manual refresh, which is worse than
+  // the over-invalidation cost of a repos.all prefix match (same tradeoff as
+  // recommendation_updated above).
+  demo_asset_updated: [queryKeys.repos.all],
   user_updated: [queryKeys.users.me],
 };
 
