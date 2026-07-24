@@ -19,6 +19,7 @@ const EVENT_QUERY_MAP: Record<string, QueryKey[]> = {
   drafts_generated: [queryKeys.drafts.all, queryKeys.runs.all],
   opportunities_generated: [queryKeys.opportunities.all, queryKeys.runs.all],
   opportunity_updated: [queryKeys.opportunities.all],
+  demo_asset_updated: [queryKeys.demoAssets.all],
   user_updated: [queryKeys.users.me],
 };
 

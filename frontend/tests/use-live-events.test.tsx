@@ -127,6 +127,22 @@ describe("useLiveEvents", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.opportunities.all });
   });
 
+  it("invalidates demoAssets.all when demo_asset_updated arrives", () => {
+    const queryClient = new QueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <Harness />
+      </QueryClientProvider>,
+    );
+
+    const source = FakeEventSource.instances[0];
+    source.emit("demo_asset_updated", { id: 1, status: "ready" });
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.demoAssets.all });
+  });
+
   it("invalidates the users.me query when a user_updated event arrives", () => {
     const queryClient = new QueryClient();
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");

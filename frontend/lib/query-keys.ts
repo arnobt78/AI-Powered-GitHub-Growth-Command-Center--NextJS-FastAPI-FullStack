@@ -24,6 +24,9 @@ export const queryKeys = {
   opportunities: {
     all: ["opportunities"] as const,
   },
+  demoAssets: {
+    all: ["demo-assets"] as const,
+  },
   users: {
     me: ["users", "me"] as const,
   },

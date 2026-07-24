@@ -1,6 +1,7 @@
 import { backendFetch, backendFetchSystem } from "@/lib/backend-client";
 import type {
   Benchmark,
+  DemoAsset,
   Draft,
   Insights,
   Opportunity,
@@ -43,6 +44,10 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ dismissed }),
     }),
+
+  listDemoAssets: (repoId: number) => backendFetch<DemoAsset[]>(`/repos/${repoId}/demo-assets`),
+  triggerDemoAsset: (repoId: number) =>
+    backendFetch<{ status: string }>(`/repos/${repoId}/demo-assets`, { method: "POST" }),
 
   listDrafts: () => backendFetch<Draft[]>("/drafts"),
   reviewDraft: (id: number, status: "approved" | "rejected") =>

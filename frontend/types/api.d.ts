@@ -365,6 +365,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/repos/{repo_id}/demo-assets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Demo Assets */
+        get: operations["list_demo_assets_repos__repo_id__demo_assets_get"];
+        put?: never;
+        /** Trigger Demo Asset */
+        post: operations["trigger_demo_asset_repos__repo_id__demo_assets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/demo-assets/{demo_asset_id}/video": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Demo Asset Video */
+        get: operations["get_demo_asset_video_demo_assets__demo_asset_id__video_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -396,6 +431,24 @@ export interface components {
             forks: number;
             /** Topics */
             topics: string[];
+        };
+        /** DemoAssetOut */
+        DemoAssetOut: {
+            /** Id */
+            id: number;
+            /** Repo Id */
+            repo_id: number;
+            /** Status */
+            status: string;
+            /** Video Path */
+            video_path: string | null;
+            /** Error Message */
+            error_message: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** DraftOut */
         DraftOut: {
@@ -611,6 +664,11 @@ export interface components {
             duration_ms: number;
             /** Error */
             error: string | null;
+        };
+        /** TriggerDemoAssetOut */
+        TriggerDemoAssetOut: {
+            /** Status */
+            status: string;
         };
         /** TriggerRunOut */
         TriggerRunOut: {
@@ -1494,6 +1552,108 @@ export interface operations {
                 "x-internal-user-token"?: string;
             };
             path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_demo_assets_repos__repo_id__demo_assets_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-internal-user-token"?: string;
+            };
+            path: {
+                repo_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DemoAssetOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    trigger_demo_asset_repos__repo_id__demo_assets_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-internal-user-token"?: string;
+            };
+            path: {
+                repo_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TriggerDemoAssetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_demo_asset_video_demo_assets__demo_asset_id__video_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-internal-user-token"?: string;
+            };
+            path: {
+                demo_asset_id: number;
+            };
             cookie?: never;
         };
         requestBody?: never;
