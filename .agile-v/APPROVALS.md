@@ -112,4 +112,18 @@ Append-only. `GATE-XXXX` with Gate type, Cycle, Scope, Decision (Approved/Condit
 - **Evidence Reference:** commit range `dc4d83f..918844d` (9 commits, Phase 4C plan through Task 8); pushed to `https://github.com/arnobt78/github-growth-bot` at `main`
 - **Closes:** Phase 4C Stage 5 acceptance (no `CHECKPOINTS.md` interrupt was opened for this sub-scope — same as every prior Phase 4 sub-project, approval requested directly via Evidence Summary rather than a durable interrupt)
 
-Next entry will be `GATE-0008`.
+## GATE-0008
+
+- **Gate type:** Gate 2 (Acceptance)
+- **Cycle:** C1
+- **Scope:** Phase 4D community & trend monitoring (REQ-0024) — 9-task subagent-driven build (`docs/superpowers/plans/2026-07-24-phase4d-community-monitoring.md`), 1 task-scoped fix round (Task 3's GraphQL null-safety gap), final whole-branch review (opus) that found and fixed 1 Important cross-task gap (opportunities pipeline runs mislabeled in the Runs page) plus 1 Minor hardening, re-reviewed clean.
+- **Decision:** Approved
+- **Conditions:** None. (`alembic upgrade head` against real Postgres remains the Product Owner's own follow-up step. Reddit monitoring remains deferred pending a Reddit developer app registration. Deployment itself remains separately gated per POL-0006.)
+- **Approver:** Arnob Mahmud
+- **Role/Authority:** Project Owner / Sole Stakeholder (per config.json authority_matrix)
+- **Timestamp:** 2026-07-24
+- **Signature Method:** Standing explicit instruction in chat ("commite in github if all okay as flawless after code review") given at the start of this multi-phase build session, applied here after a clean final whole-branch review — non-regulated context, name + timestamp is the required minimum per `agile-v-compliance`'s signature table
+- **Evidence Reference:** commit range `a0e59f8..b0b8dbc` (10 commits, Phase 4D plan through the final-review fix); pushed to `https://github.com/arnobt78/github-growth-bot` at `main`
+- **Closes:** Phase 4D Stage 5 acceptance (no `CHECKPOINTS.md` interrupt was opened for this sub-scope — same as every prior Phase 4 sub-project, approval requested directly via Evidence Summary rather than a durable interrupt)
+
+Next entry will be `GATE-0009`.
