@@ -210,3 +210,64 @@ def test_list_repo_discussions_raises_needs_reauth_on_401():
 
     with pytest.raises(GitHubAuthError):
         client.list_repo_discussions("octocat", "hello-world")
+
+
+def test_create_issue_comment_posts_body():
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/repos/octocat/hello-world/issues/42/comments":
+            import json as json_module
+            captured["body"] = json_module.loads(request.read())
+            return httpx.Response(201, json={"id": 999, "body": captured["body"]["body"]})
+        return httpx.Response(404)
+
+    http = httpx.Client(base_url="https://api.github.com", transport=httpx.MockTransport(handler))
+    client = GitHubClient(token="fake-token", http_client=http)
+
+    result = client.create_issue_comment("octocat", "hello-world", 42, "Thanks for the report!")
+
+    assert captured["body"] == {"body": "Thanks for the report!"}
+    assert result["id"] == 999
+
+
+def test_create_issue_comment_raises_needs_reauth_on_401():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(401)
+
+    http = httpx.Client(base_url="https://api.github.com", transport=httpx.MockTransport(handler))
+    client = GitHubClient(token="fake-token", http_client=http)
+
+    with pytest.raises(GitHubAuthError):
+        client.create_issue_comment("octocat", "hello-world", 42, "reply")
+
+
+def test_create_discussion_comment_posts_mutation():
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/graphql" and request.method == "POST":
+            import json as json_module
+            payload = json_module.loads(request.read())
+            captured["variables"] = payload["variables"]
+            return httpx.Response(200, json={"data": {"addDiscussionComment": {"comment": {"id": "DC_123"}}}})
+        return httpx.Response(404)
+
+    http = httpx.Client(base_url="https://api.github.com", transport=httpx.MockTransport(handler))
+    client = GitHubClient(token="fake-token", http_client=http)
+
+    result = client.create_discussion_comment("D_kwDOABCD1", "Great question!")
+
+    assert captured["variables"] == {"discussionId": "D_kwDOABCD1", "body": "Great question!"}
+    assert result["data"]["addDiscussionComment"]["comment"]["id"] == "DC_123"
+
+
+def test_create_discussion_comment_raises_needs_reauth_on_401():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(401)
+
+    http = httpx.Client(base_url="https://api.github.com", transport=httpx.MockTransport(handler))
+    client = GitHubClient(token="fake-token", http_client=http)
+
+    with pytest.raises(GitHubAuthError):
+        client.create_discussion_comment("D_kwDOABCD1", "reply")

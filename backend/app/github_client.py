@@ -111,6 +111,33 @@ class GitHubClient:
         discussions = repo.get("discussions") or {}
         return discussions.get("nodes") or []
 
+    def create_issue_comment(self, owner: str, name: str, issue_number: int, body: str) -> dict:
+        """The first write method on this client — called ONLY from the
+        Draft on-approve handler (app/api/drafts.py), never from any
+        pipeline stage. Every pipeline stage remains read-only."""
+        resp = self._http.post(f"/repos/{owner}/{name}/issues/{issue_number}/comments", json={"body": body})
+        if resp.status_code == 401:
+            raise GitHubAuthError(f"needs_reauth: GitHub token rejected posting to {owner}/{name}#{issue_number}")
+        resp.raise_for_status()
+        return resp.json()
+
+    def create_discussion_comment(self, discussion_id: str, body: str) -> dict:
+        """Same write-only-from-drafts-approval rule as create_issue_comment."""
+        graphql_query = """
+        mutation($discussionId: ID!, $body: String!) {
+          addDiscussionComment(input: {discussionId: $discussionId, body: $body}) {
+            comment { id }
+          }
+        }
+        """
+        resp = self._http.post(
+            "/graphql", json={"query": graphql_query, "variables": {"discussionId": discussion_id, "body": body}}
+        )
+        if resp.status_code == 401:
+            raise GitHubAuthError("needs_reauth: GitHub token rejected posting a discussion comment")
+        resp.raise_for_status()
+        return resp.json()
+
     def search_discussions(self, query: str, limit: int = 5) -> list[dict]:
         graphql_query = """
         query($searchQuery: String!, $limit: Int!) {
