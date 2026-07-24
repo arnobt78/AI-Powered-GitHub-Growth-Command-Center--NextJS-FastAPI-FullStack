@@ -86,3 +86,36 @@ def test_synthesizer_builds_release_notes_prompt():
     assert "hello-world" in sent_prompt
     assert "v1.2.0" in sent_prompt
     assert "- Added dark mode" in sent_prompt
+
+
+def test_synthesizer_builds_issue_reply_prompt():
+    task = ContentTask(
+        kind="issue_reply", target="issue:42", structured=False, current=None,
+        source_material={"title": "Bug: crashes on startup", "body": "It crashes.", "repo_name": "hello-world"},
+    )
+    ctx = _ctx_with_task(task)
+    llm = _fake_llm(["Thanks for the report! Can you share the full stack trace?"])
+
+    ctx = ContentSynthesizer(llm_router=llm).run(ctx)
+
+    assert ctx.tasks[0].candidates == ["Thanks for the report! Can you share the full stack trace?"]
+    sent_prompt = llm.chat_completion.call_args_list[0].args[0][1]["content"]
+    assert "hello-world" in sent_prompt
+    assert "Bug: crashes on startup" in sent_prompt
+    assert "It crashes." in sent_prompt
+
+
+def test_synthesizer_builds_discussion_reply_prompt():
+    task = ContentTask(
+        kind="discussion_reply", target="discussion:7", structured=False, current=None,
+        source_material={"title": "How do I configure X?", "body": "Trying to set up X.", "repo_name": "hello-world", "discussion_node_id": "D_kwDOABCD1"},
+    )
+    ctx = _ctx_with_task(task)
+    llm = _fake_llm(["Great question — check the config.yaml docs section."])
+
+    ctx = ContentSynthesizer(llm_router=llm).run(ctx)
+
+    assert ctx.tasks[0].candidates == ["Great question — check the config.yaml docs section."]
+    sent_prompt = llm.chat_completion.call_args_list[0].args[0][1]["content"]
+    assert "hello-world" in sent_prompt
+    assert "How do I configure X?" in sent_prompt

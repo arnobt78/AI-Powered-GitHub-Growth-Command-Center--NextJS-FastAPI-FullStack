@@ -35,6 +35,21 @@ _KIND_PROMPTS = {
         "Respond with the release notes text only, no commentary.\n\n"
         "Raw notes:\n{raw_notes}"
     ),
+    "issue_reply": (
+        "You are a helpful, friendly open-source maintainer replying to a new GitHub "
+        "issue on {repo_name}. Write a considerate, helpful reply — ask for missing "
+        "details if the issue is unclear, or offer initial guidance if the problem is "
+        "clear. Do not make promises about timelines or commit to specific fixes. "
+        "Respond with the reply text only, no commentary.\n\n"
+        "Issue title: {title}\nIssue body:\n{body}"
+    ),
+    "discussion_reply": (
+        "You are a helpful, friendly open-source maintainer replying to a new GitHub "
+        "Discussion on {repo_name}. Write a considerate, helpful reply engaging with "
+        "what was asked or discussed. Do not make promises about timelines or commit "
+        "to specific fixes. Respond with the reply text only, no commentary.\n\n"
+        "Discussion title: {title}\nDiscussion body:\n{body}"
+    ),
 }
 
 
@@ -58,6 +73,8 @@ class ContentSynthesizer(Stage):
             "repo_name": task.source_material.get("repo_name", ""),
             "tag": task.source_material.get("tag", ""),
             "raw_notes": task.source_material.get("raw_notes", ""),
+            "title": task.source_material.get("title", ""),
+            "body": task.source_material.get("body", ""),
         }
         return _KIND_PROMPTS[task.kind].format(**fields)
 
