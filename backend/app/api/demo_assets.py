@@ -13,6 +13,7 @@ from app.demo_asset_jobs import generate_demo_asset
 from app.deps import require_api_key, require_user
 from app.models import DemoAsset, Repo, User
 from app.rate_limit import limiter
+from app.recording_auth import mint_recording_token
 
 router = APIRouter(prefix="/repos", tags=["demo-assets"], dependencies=[Depends(require_api_key)])
 
@@ -67,7 +68,8 @@ def trigger_demo_asset(
     db.refresh(asset)
 
     settings = get_settings()
-    urls = [f"{settings.frontend_base_url}/repos/{repo.id}"]
+    recording_token = mint_recording_token(repo_id=repo.id, user_id=current_user.id)
+    urls = [f"{settings.frontend_base_url}/repos/{repo.id}?recording_token={recording_token}"]
     background_tasks.add_task(_background_generate_demo_asset, asset.id, urls)
     return TriggerDemoAssetOut(status="started")
 

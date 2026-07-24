@@ -1,5 +1,6 @@
 import NextAuth from "next-auth";
 import GitHub from "next-auth/providers/github";
+import { isAuthorizedRecordingRequest } from "@/lib/recording-auth";
 
 const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:8000";
 const BACKEND_API_KEY = process.env.BACKEND_API_KEY ?? "";
@@ -20,7 +21,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     // internal `authorized` defaults to `true` unconditionally (see
     // node_modules/next-auth/lib/index.js) and the proxy becomes a silent
     // passthrough — no redirect ever fires for unauthenticated requests.
-    authorized({ auth }) {
+    authorized({ request, auth }) {
+      // Phase 4G: the backend's headless Playwright recorder has no real
+      // browser session — it proves it's allowed to view one specific
+      // repo-detail page via a short-lived, repo-scoped signed token
+      // (backend/app/recording_auth.py mints it, lib/recording-auth.ts
+      // verifies it here) instead of a cookie. Checked first since the
+      // recorder never carries a session at all.
+      if (isAuthorizedRecordingRequest(request)) {
+        return true;
+      }
       return !!auth?.user;
     },
     async jwt({ token, account, profile }) {

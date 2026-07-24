@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     # Phase 4G: Demo asset generation
     demo_assets_dir: str = "demo_assets"
     demo_asset_retention_days: int = 3
+    recording_auth_secret: str = ""
 
 
 @lru_cache

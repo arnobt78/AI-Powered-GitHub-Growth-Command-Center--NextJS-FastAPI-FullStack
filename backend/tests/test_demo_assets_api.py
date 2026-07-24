@@ -32,6 +32,29 @@ def test_trigger_demo_asset_returns_202_and_creates_generating_row(client, seed_
     db.close()
 
 
+def test_trigger_demo_asset_url_carries_a_recording_token_scoped_to_the_repo(client, seed_user):
+    import base64
+    import json
+
+    repo_id = _seed_repo(seed_user)
+
+    with patch("app.api.demo_assets._background_generate_demo_asset") as mock_bg:
+        client.post(f"/repos/{repo_id}/demo-assets")
+
+    _demo_asset_id, urls = mock_bg.call_args.args
+    assert len(urls) == 1
+    assert urls[0].startswith(f"{get_settings().frontend_base_url}/repos/{repo_id}?recording_token=")
+
+    token = urls[0].split("recording_token=", 1)[1]
+    payload_b64, signature = token.rsplit(".", 1)
+    padding = "=" * (-len(payload_b64) % 4)
+    payload = json.loads(base64.urlsafe_b64decode(payload_b64 + padding))
+
+    assert payload["repo_id"] == repo_id
+    assert payload["user_id"] == seed_user
+    assert isinstance(signature, str) and len(signature) == 64
+
+
 def test_trigger_demo_asset_404_for_other_users_repo(client, other_user_client):
     repo_id = _seed_repo(other_user_client.test_user_id)
 

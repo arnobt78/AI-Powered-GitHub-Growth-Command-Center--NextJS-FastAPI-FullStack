@@ -15,6 +15,7 @@ os.environ.setdefault("API_KEY", "test-key")
 # ephemeral test DB above.
 os.environ.setdefault("TOKEN_ENCRYPTION_KEY", Fernet.generate_key().decode())
 os.environ.setdefault("INTERNAL_AUTH_SECRET", "test-only-internal-secret-do-not-use-in-prod")
+os.environ.setdefault("RECORDING_AUTH_SECRET", "test-only-recording-secret-do-not-use-in-prod")
 
 
 @pytest.fixture(autouse=True)
