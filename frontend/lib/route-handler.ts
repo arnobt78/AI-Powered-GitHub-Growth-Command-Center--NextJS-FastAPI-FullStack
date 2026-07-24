@@ -7,9 +7,19 @@ import { runWithRecordingToken } from "@/lib/request-identity";
 // recording session — see lib/request-identity.ts. Extracts recording_token
 // from either the query string (client-side TanStack Query fetches append
 // it there, see lib/fetch-json.ts) or an X-Recording-Token header.
+//
+// GET only: the recorder (backend/app/demo_recorder.py) only ever navigates
+// and reads, never submits anything, so the token only needs to unlock
+// reads. recordingIdentityFromToken deliberately isn't repo-scoped (unlike
+// the page gate in auth.ts) — the backend's per-user query filtering is
+// what actually authorizes each read. Honoring it on POST/PATCH/DELETE too
+// would turn a token meant for one read-only page into a general-purpose,
+// if short-lived, write credential for the whole account.
 export async function proxyRoute<T>(request: Request, fn: () => Promise<T>, successStatus = 200) {
   const recordingToken =
-    new URL(request.url).searchParams.get("recording_token") ?? request.headers.get("x-recording-token");
+    request.method === "GET"
+      ? (new URL(request.url).searchParams.get("recording_token") ?? request.headers.get("x-recording-token"))
+      : null;
 
   return runWithRecordingToken(recordingToken, async () => {
     try {

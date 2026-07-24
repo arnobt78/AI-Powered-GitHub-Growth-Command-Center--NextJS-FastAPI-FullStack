@@ -66,6 +66,28 @@ def test_generate_demo_asset_failure_marks_failed(mock_recorder_cls, mock_publis
 
 
 @patch("app.demo_asset_jobs.broadcaster.publish")
+@patch("app.demo_asset_jobs.DemoRecorder")
+def test_generate_demo_asset_redacts_recording_token_from_persisted_error(mock_recorder_cls, mock_publish, seed_user):
+    _repo_id, asset_id = _seed_demo_asset(seed_user)
+
+    mock_recorder = MagicMock()
+    mock_recorder.record.side_effect = RuntimeError(
+        "Timeout 30000ms exceeded navigating to "
+        "https://example.com/repos/1?recording_token=abcDEF123.deadbeef1234"
+    )
+    mock_recorder_cls.return_value = mock_recorder
+
+    db = SessionLocal()
+    generate_demo_asset(db, asset_id, urls=["https://example.com/repos/1?recording_token=abcDEF123.deadbeef1234"])
+
+    asset = db.get(DemoAsset, asset_id)
+    assert asset.status == "failed"
+    assert "recording_token=[redacted]" in asset.error_message
+    assert "abcDEF123" not in asset.error_message
+    db.close()
+
+
+@patch("app.demo_asset_jobs.broadcaster.publish")
 @patch("app.demo_asset_jobs.os.remove")
 @patch("app.demo_asset_jobs.VideoCompositor")
 @patch("app.demo_asset_jobs.DemoRecorder")

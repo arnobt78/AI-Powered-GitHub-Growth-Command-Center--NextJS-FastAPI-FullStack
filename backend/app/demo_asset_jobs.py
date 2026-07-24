@@ -1,4 +1,5 @@
 import os
+import re
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
@@ -31,7 +32,11 @@ def generate_demo_asset(db: Session, demo_asset_id: int, urls: list[str]) -> Non
         asset.video_path = mp4_filename
     except Exception as exc:
         asset.status = "failed"
-        asset.error_message = str(exc)
+        # Playwright's navigation-failure messages embed the full URL,
+        # which carries ?recording_token=... — that's a live (if
+        # short-lived and single-user-scoped) credential and must never be
+        # persisted or served back via GET /repos/{id}/demo-assets.
+        asset.error_message = re.sub(r"recording_token=[^&\s]*", "recording_token=[redacted]", str(exc))
 
     db.commit()
     broadcaster.publish("demo_asset_updated", {"id": asset.id, "status": asset.status}, user_id=asset.user_id)
