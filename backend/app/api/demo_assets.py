@@ -1,6 +1,8 @@
+import os
 from datetime import datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -76,3 +78,21 @@ def _background_generate_demo_asset(demo_asset_id: int, urls: list[str]) -> None
         generate_demo_asset(db, demo_asset_id, urls)
     finally:
         db.close()
+
+
+video_router = APIRouter(prefix="/demo-assets", tags=["demo-assets"], dependencies=[Depends(require_api_key)])
+
+
+@video_router.get("/{demo_asset_id}/video")
+def get_demo_asset_video(
+    demo_asset_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_user)
+) -> FileResponse:
+    asset = db.execute(
+        select(DemoAsset).where(DemoAsset.id == demo_asset_id, DemoAsset.user_id == current_user.id)
+    ).scalars().first()
+    if asset is None or asset.status != "ready" or not asset.video_path:
+        raise HTTPException(status_code=404, detail="Demo asset not found")
+
+    settings = get_settings()
+    full_path = os.path.join(settings.demo_assets_dir, asset.video_path)
+    return FileResponse(full_path, media_type="video/mp4")

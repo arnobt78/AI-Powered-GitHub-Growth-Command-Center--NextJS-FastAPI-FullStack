@@ -1,5 +1,7 @@
+import os
 from unittest.mock import patch
 
+from app.config import get_settings
 from app.db import SessionLocal
 from app.models import DemoAsset, Repo
 
@@ -56,5 +58,55 @@ def test_list_demo_assets_404_for_other_users_repo(client, other_user_client):
     repo_id = _seed_repo(other_user_client.test_user_id)
 
     resp = client.get(f"/repos/{repo_id}/demo-assets")
+
+    assert resp.status_code == 404
+
+
+def _seed_ready_asset(user_id: int, repo_id: int, filename: str) -> int:
+    settings = get_settings()
+    os.makedirs(settings.demo_assets_dir, exist_ok=True)
+    full_path = os.path.join(settings.demo_assets_dir, filename)
+    with open(full_path, "wb") as f:
+        f.write(b"fake mp4 bytes")
+
+    db = SessionLocal()
+    asset = DemoAsset(user_id=user_id, repo_id=repo_id, status="ready", video_path=filename)
+    db.add(asset)
+    db.commit()
+    db.refresh(asset)
+    asset_id = asset.id
+    db.close()
+    return asset_id
+
+
+def test_get_video_returns_file_for_ready_asset(client, seed_user):
+    repo_id = _seed_repo(seed_user)
+    asset_id = _seed_ready_asset(seed_user, repo_id, "test-video.mp4")
+
+    resp = client.get(f"/demo-assets/{asset_id}/video")
+
+    assert resp.status_code == 200
+    assert resp.content == b"fake mp4 bytes"
+
+
+def test_get_video_404_for_not_ready_asset(client, seed_user):
+    repo_id = _seed_repo(seed_user)
+    db = SessionLocal()
+    asset = DemoAsset(user_id=seed_user, repo_id=repo_id, status="generating")
+    db.add(asset)
+    db.commit()
+    asset_id = asset.id
+    db.close()
+
+    resp = client.get(f"/demo-assets/{asset_id}/video")
+
+    assert resp.status_code == 404
+
+
+def test_get_video_404_for_other_users_asset(client, other_user_client):
+    repo_id = _seed_repo(other_user_client.test_user_id)
+    asset_id = _seed_ready_asset(other_user_client.test_user_id, repo_id, "other-video.mp4")
+
+    resp = client.get(f"/demo-assets/{asset_id}/video")
 
     assert resp.status_code == 404
