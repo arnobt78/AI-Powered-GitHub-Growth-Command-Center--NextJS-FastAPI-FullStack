@@ -100,5 +100,6 @@ class GitHubClient:
         if resp.status_code == 401:
             raise GitHubAuthError(f"needs_reauth: GitHub token rejected for GraphQL search '{query}'")
         resp.raise_for_status()
-        data = resp.json()
-        return data.get("data", {}).get("search", {}).get("nodes", [])
+        data = resp.json().get("data") or {}
+        search = data.get("search") or {}
+        return search.get("nodes") or []

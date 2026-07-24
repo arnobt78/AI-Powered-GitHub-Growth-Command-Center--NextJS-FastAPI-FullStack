@@ -150,3 +150,18 @@ def test_search_discussions_raises_needs_reauth_on_401():
 
     with pytest.raises(GitHubAuthError):
         client.search_discussions("hello-world")
+
+
+def test_search_discussions_handles_null_search_from_graphql_partial_error():
+    """Test that explicit null values in GraphQL response (from resolver errors)
+    don't crash with AttributeError but gracefully return empty list."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        # GitHub's GraphQL API can return {"data": {"search": null}} for
+        # certain partial errors (e.g. resolver timeouts) instead of omitting the key
+        return httpx.Response(200, json={"data": {"search": None}})
+
+    http = httpx.Client(base_url="https://api.github.com", transport=httpx.MockTransport(handler))
+    client = GitHubClient(token="fake-token", http_client=http)
+
+    nodes = client.search_discussions("test-query")
+    assert nodes == []
