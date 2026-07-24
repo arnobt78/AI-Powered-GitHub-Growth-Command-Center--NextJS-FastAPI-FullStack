@@ -9,7 +9,9 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.deps import require_api_key, require_user
 from app.events import broadcaster
-from app.models import Draft, User
+from app.github_client import GitHubClient
+from app.models import Draft, Repo, User
+from app.token_crypto import decrypt_token
 
 router = APIRouter(prefix="/drafts", tags=["drafts"], dependencies=[Depends(require_api_key)])
 
@@ -21,6 +23,7 @@ class DraftOut(BaseModel):
     target: str
     content: dict
     status: str
+    error_message: str | None
     created_at: datetime
     reviewed_at: datetime | None
 
@@ -57,7 +60,26 @@ def review_draft(
     # Reuse created_at's own tzinfo (set by models._now(), i.e. UTC) rather than a
     # bare datetime.now() — keeps reviewed_at timezone-aware and consistent with it.
     draft.reviewed_at = datetime.now(draft.created_at.tzinfo)
+
+    if payload.status == "approved" and draft.kind in ("issue_reply", "discussion_reply"):
+        _post_reply(draft, current_user, db)
+
     db.commit()
     db.refresh(draft)
     broadcaster.publish("draft_updated", {"id": draft.id, "status": draft.status}, user_id=current_user.id)
     return draft
+
+
+def _post_reply(draft: Draft, current_user: User, db: Session) -> None:
+    repo = db.get(Repo, draft.repo_id)
+    try:
+        gh_client = GitHubClient(token=decrypt_token(current_user.access_token_encrypted))
+        if draft.kind == "issue_reply":
+            issue_number = int(draft.target.removeprefix("issue:"))
+            gh_client.create_issue_comment(repo.owner, repo.name, issue_number, draft.content["suggested"])
+        else:
+            gh_client.create_discussion_comment(draft.content["discussion_node_id"], draft.content["suggested"])
+        draft.status = "posted"
+    except Exception as exc:
+        draft.status = "failed"
+        draft.error_message = str(exc)

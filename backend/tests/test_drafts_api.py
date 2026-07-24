@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from app.db import SessionLocal
 from app.models import Draft, Repo
@@ -19,6 +19,22 @@ def _seed_draft_for(user_id: int, status: str = "pending") -> tuple[int, int]:
         content={"text": "Add a Quick Start section."},
         status=status,
     )
+    db.add(draft)
+    db.commit()
+    db.refresh(draft)
+    repo_id, draft_id = repo.id, draft.id
+    db.close()
+    return repo_id, draft_id
+
+
+def _seed_reply_draft(user_id: int, kind: str, target: str, content: dict) -> tuple[int, int]:
+    db = SessionLocal()
+    repo = Repo(owner="octocat", name="hello-world", user_id=user_id)
+    db.add(repo)
+    db.commit()
+    db.refresh(repo)
+
+    draft = Draft(user_id=user_id, repo_id=repo.id, kind=kind, target=target, content=content, status="pending")
     db.add(draft)
     db.commit()
     db.refresh(draft)
@@ -91,3 +107,72 @@ def test_drafts_require_user_token(client_without_user_token):
 
     resp = client_without_user_token.patch("/drafts/1", json={"status": "approved"})
     assert resp.status_code == 401
+
+
+@patch("app.api.drafts.GitHubClient")
+def test_approve_issue_reply_posts_comment_and_marks_posted(mock_gh_cls, client):
+    mock_gh = MagicMock()
+    mock_gh.create_issue_comment.return_value = {"id": 999}
+    mock_gh_cls.return_value = mock_gh
+
+    _repo_id, draft_id = _seed_reply_draft(
+        client.test_user_id, "issue_reply", "issue:42", {"suggested": "Thanks for the report!", "reason": "acknowledges"},
+    )
+
+    resp = client.patch(f"/drafts/{draft_id}", json={"status": "approved"})
+
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "posted"
+    mock_gh.create_issue_comment.assert_called_once_with("octocat", "hello-world", 42, "Thanks for the report!")
+
+
+@patch("app.api.drafts.GitHubClient")
+def test_approve_discussion_reply_posts_comment_and_marks_posted(mock_gh_cls, client):
+    mock_gh = MagicMock()
+    mock_gh.create_discussion_comment.return_value = {"data": {}}
+    mock_gh_cls.return_value = mock_gh
+
+    _repo_id, draft_id = _seed_reply_draft(
+        client.test_user_id, "discussion_reply", "discussion:7",
+        {"suggested": "Great question!", "reason": "directly answers", "discussion_node_id": "D_kwDOABCD1"},
+    )
+
+    resp = client.patch(f"/drafts/{draft_id}", json={"status": "approved"})
+
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "posted"
+    mock_gh.create_discussion_comment.assert_called_once_with("D_kwDOABCD1", "Great question!")
+
+
+@patch("app.api.drafts.GitHubClient")
+def test_approve_issue_reply_marks_failed_on_posting_error(mock_gh_cls, client):
+    mock_gh = MagicMock()
+    mock_gh.create_issue_comment.side_effect = RuntimeError("GitHub API unavailable")
+    mock_gh_cls.return_value = mock_gh
+
+    _repo_id, draft_id = _seed_reply_draft(
+        client.test_user_id, "issue_reply", "issue:42", {"suggested": "Thanks!", "reason": "ack"},
+    )
+
+    resp = client.patch(f"/drafts/{draft_id}", json={"status": "approved"})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "failed"
+    assert body["error_message"] == "GitHub API unavailable"
+
+
+@patch("app.api.drafts.GitHubClient")
+def test_reject_issue_reply_never_posts(mock_gh_cls, client):
+    mock_gh = MagicMock()
+    mock_gh_cls.return_value = mock_gh
+
+    _repo_id, draft_id = _seed_reply_draft(
+        client.test_user_id, "issue_reply", "issue:42", {"suggested": "Thanks!", "reason": "ack"},
+    )
+
+    resp = client.patch(f"/drafts/{draft_id}", json={"status": "rejected"})
+
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "rejected"
+    mock_gh.create_issue_comment.assert_not_called()
