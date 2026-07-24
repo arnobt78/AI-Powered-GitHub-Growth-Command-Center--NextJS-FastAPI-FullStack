@@ -140,4 +140,18 @@ Append-only. `GATE-XXXX` with Gate type, Cycle, Scope, Decision (Approved/Condit
 - **Evidence Reference:** commit range `aebe25c..9306fbc` (10 commits, Phase 4F plan through Task 10); pushed to `https://github.com/arnobt78/github-growth-bot` at `main`
 - **Closes:** Phase 4F Stage 5 acceptance (no `CHECKPOINTS.md` interrupt was opened for this sub-scope — same as every prior Phase 4 sub-project, approval requested directly via Evidence Summary rather than a durable interrupt)
 
-Next entry will be `GATE-0010`.
+## GATE-0010
+
+- **Gate type:** Gate 2 (Acceptance)
+- **Cycle:** C1
+- **Scope:** Phase 4G demo asset generation (REQ-0026) — the final sub-project of the Phase 4 build sequence. 9-task subagent-driven build (`docs/superpowers/plans/2026-07-24-phase4g-demo-asset-generation.md`), 1 task-scoped fix round (Task 8's frontend data layer: a cross-repo cache-collision bug, then a self-inflicted SSE-invalidation regression while fixing it, both closed in the same loop). The final whole-branch review surfaced a genuine, unscoped gap not covered by the original plan — the headless recorder had no browser session, so it silently captured the sign-in page instead of the dashboard — which required designing and building a purpose-built authenticated-recording mechanism (repo-scoped page-gate token + AsyncLocalStorage-based backend-identity propagation) through 3 additional fix rounds under two independent adversarial security reviews, including empirical concurrency testing (120+ concurrent requests under different identities, zero cross-request context bleed) before it was accepted. Final whole-branch review (opus) covering the complete 18-commit diff: 0 Critical, 1 Important (video Route Handler dropped Range-header forwarding — fixed with test coverage), several accepted Minors — verdict "ready to merge."
+- **Decision:** Approved
+- **Conditions:** None. (`alembic upgrade head` against real Postgres, `RECORDING_AUTH_SECRET` generation in both `backend/.env`/`frontend/.env.local`, and `ffmpeg`/`playwright install chromium --with-deps` on the deploy target remain the Product Owner's own follow-up steps, same pattern as every prior deploy-time/live-verification step. Cloud storage for demo assets remains deferred pending the Product Owner choosing a provider and generating credentials. Deployment itself remains separately gated per POL-0006.)
+- **Approver:** Arnob Mahmud
+- **Role/Authority:** Project Owner / Sole Stakeholder (per config.json authority_matrix)
+- **Timestamp:** 2026-07-24
+- **Signature Method:** Standing explicit instruction in chat ("commite in github if all okay as flawless after code review") given at the start of this multi-phase build session, applied here after a clean final whole-branch review — non-regulated context, name + timestamp is the required minimum per `agile-v-compliance`'s signature table
+- **Evidence Reference:** commit range `68f2ce9..f0a3fbe` (18 commits, Phase 4G plan through the final Range-header fix); pushed to `https://github.com/arnobt78/github-growth-bot` at `main`
+- **Closes:** Phase 4G Stage 5 acceptance (no `CHECKPOINTS.md` interrupt was opened for this sub-scope — same as every prior Phase 4 sub-project, approval requested directly via Evidence Summary rather than a durable interrupt). **This closes the Product Owner's entire authorized Phase 4 build sequence (4E→4C→4D→4F→4G).**
+
+Next entry will be `GATE-0011`.

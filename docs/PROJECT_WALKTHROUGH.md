@@ -64,7 +64,9 @@ Every endpoint requires `Authorization: Bearer <API_KEY>` except the health chec
 | `POST /users/upsert` | Provisions/updates a `User` row on sign-in (called by Auth.js, not by the browser) |
 | `GET /users/me` / `PATCH /users/me` | Read/update the signed-in user's own profile — today just the notification-email fallback (Phase 4E) |
 | `GET /opportunities` / `PATCH /opportunities/{id}` | Community-mention inbox (Phase 4D) — dismissable, not approve/reject; `POST /runs/opportunities` manually triggers the HN/GitHub Discussions poll |
-| `GET /events` | Server-Sent Events stream, scoped per-user — pushes live updates when anything changes (a recommendation gets dismissed, a repo gets added, a run completes, a draft gets reviewed) |
+| `GET/POST /repos/{id}/demo-assets` | List/trigger a demo-video recording for one repo (Phase 4G) — `POST` returns 202 and runs in the background; no Draft involved, nothing here needs approval |
+| `GET /demo-assets/{id}/video` | Streams the generated mp4 back once `status` is `ready` — 404 for anything else, including not-yet-finished or someone else's asset |
+| `GET /events` | Server-Sent Events stream, scoped per-user — pushes live updates when anything changes (a recommendation gets dismissed, a repo gets added, a run completes, a draft gets reviewed, a demo video finishes generating) |
 
 ## Why the frontend feels instant
 
@@ -88,6 +90,8 @@ Everything beyond analytics (README suggestions, release notes, social posts, is
 
 **Issue/discussion auto-response (Phase 4F):** the content pipeline now also fetches each tracked repo's own open issues and Discussions, drafting a suggested reply for anything genuinely new — deduped by checking whether a Draft already exists for that specific issue/discussion (any status counts as "already handled"), rather than a single high-water-mark, since several new items can arrive between polls. This is the first Draft kind whose approval does something real: `PATCH /drafts/{id}` with `status: "approved"` on an `issue_reply`/`discussion_reply` Draft synchronously posts the LLM-drafted reply to the actual GitHub issue or Discussion, then resolves to `"posted"` or `"failed"` (with a stored reason) — rejecting, as always, never posts anything. This is also the first time `GitHubClient` gains a write capability at all; both write methods are called from exactly one place in the entire codebase — the approval handler — never from any pipeline stage, so nothing can ever post without a human clicking approve first.
 
+**Demo asset generation (Phase 4G, the final Phase 4 sub-project):** a "Generate" button on each repo's detail page kicks off a real screen recording — a headless Chromium instance (Playwright) navigates that repo's own live dashboard, and `ffmpeg` composites the raw capture into an mp4, stored on local disk (not `Draft` — a screen recording of your own dashboard has nothing to approve and posts nowhere external, so this is a standalone `DemoAsset` table instead, same shape as the Opportunities inbox). A daily cleanup job deletes anything older than 3 days, win or fail, so a shared demo VPS never fills up with other people's recordings. The one real wrinkle: the headless browser has no login session of its own, so it can't just visit the dashboard like a real signed-in user would — a short-lived, single-page-scoped signed token (minted by the backend, valid for 60 seconds, GET requests only) stands in for a session just long enough to render that one page and its data, then expires. It cannot be reused to view a different repo, and it cannot be used to change anything — the same protections that stop the pipeline from ever posting content without a human approving it also apply here.
+
 ## Safety rails baked into the design
 
 - **No write access to GitHub, anywhere, except an explicitly approved Draft.** `GitHubClient`'s only two write methods (`create_issue_comment`, `create_discussion_comment` — issue/discussion replies, added in Phase 4F) are called from exactly one place in the entire codebase: the Draft approval handler, never a pipeline stage. Every other method is still `get_*`/`has_file`/`search_*`/`list_*` — nothing that could star, fork, follow, or otherwise touch another account's repo, even by accident.
@@ -95,6 +99,7 @@ Everything beyond analytics (README suggestions, release notes, social posts, is
 - **A single tracked repo's failure never affects the others** — per-stage, per-repo error isolation all the way through the pipeline. Per-user isolation too: one tenant's expired/corrupted GitHub token can't abort another tenant's run.
 - **The backend's API key never reaches the browser** — the Next.js frontend proxies every call server-side.
 - **No auto-starring/forking/following/posting, ever.** Standing policy (POL-0001), enforced by code review on every change.
+- **The demo-recording bypass token (Phase 4G) can only read one page for one minute — never write anything.** It's scoped to a single repo's dashboard, expires in 60 seconds, and is rejected outright on any non-`GET` request — so even a captured token can't approve a Draft, delete a repo, or do anything a real write action would require.
 
 ## Where to go deeper
 
