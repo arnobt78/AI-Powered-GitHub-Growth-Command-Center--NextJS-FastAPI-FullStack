@@ -68,7 +68,7 @@ def trigger_demo_asset(
     db.refresh(asset)
 
     settings = get_settings()
-    recording_token = mint_recording_token(repo_id=repo.id, user_id=current_user.id)
+    recording_token = mint_recording_token(repo_id=repo.id, user_id=current_user.id, github_id=current_user.github_id)
     urls = [f"{settings.frontend_base_url}/repos/{repo.id}?recording_token={recording_token}"]
     background_tasks.add_task(_background_generate_demo_asset, asset.id, urls)
     return TriggerDemoAssetOut(status="started")

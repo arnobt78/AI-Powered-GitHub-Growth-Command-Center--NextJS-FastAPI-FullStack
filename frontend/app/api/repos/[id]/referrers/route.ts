@@ -1,7 +1,7 @@
 import { api } from "@/lib/api";
 import { proxyRoute } from "@/lib/route-handler";
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return proxyRoute(() => api.listReferrers(Number(id)));
+  return proxyRoute(request, () => api.listReferrers(Number(id)));
 }

@@ -21,20 +21,20 @@ describe("mintRecordingToken / verifyRecordingToken", () => {
 
   it("round-trips a valid token", async () => {
     const { mintRecordingToken, verifyRecordingToken } = await freshModule("test-only-recording-secret-do-not-use-in-prod");
-    const token = mintRecordingToken(42, 7);
-    expect(verifyRecordingToken(token)).toEqual({ repoId: 42, userId: 7 });
+    const token = mintRecordingToken(42, 7, "12345");
+    expect(verifyRecordingToken(token)).toEqual({ repoId: 42, userId: 7, githubId: "12345" });
   });
 
   it("rejects a tampered signature (short)", async () => {
     const { mintRecordingToken, verifyRecordingToken } = await freshModule("test-only-recording-secret-do-not-use-in-prod");
-    const token = mintRecordingToken(42, 7);
+    const token = mintRecordingToken(42, 7, "12345");
     const [payloadB64] = token.split(".");
     expect(verifyRecordingToken(`${payloadB64}.deadbeef`)).toBeNull();
   });
 
   it("rejects a tampered signature that's the right length (exercises the constant-time compare, not just the length check)", async () => {
     const { mintRecordingToken, verifyRecordingToken } = await freshModule("test-only-recording-secret-do-not-use-in-prod");
-    const token = mintRecordingToken(42, 7);
+    const token = mintRecordingToken(42, 7, "12345");
     const [payloadB64, signature] = token.split(".");
     const wrongSameLength = signature.slice(0, -2) + (signature.slice(-2) === "00" ? "11" : "00");
     expect(verifyRecordingToken(`${payloadB64}.${wrongSameLength}`)).toBeNull();
@@ -43,7 +43,7 @@ describe("mintRecordingToken / verifyRecordingToken", () => {
   it("rejects an expired token", async () => {
     const { mintRecordingToken, verifyRecordingToken } = await freshModule("test-only-recording-secret-do-not-use-in-prod");
     vi.useFakeTimers();
-    const token = mintRecordingToken(42, 7);
+    const token = mintRecordingToken(42, 7, "12345");
     vi.advanceTimersByTime(61_000);
     expect(verifyRecordingToken(token)).toBeNull();
     vi.useRealTimers();
@@ -56,7 +56,7 @@ describe("mintRecordingToken / verifyRecordingToken", () => {
 
   it("fails closed (rejects every token) when the secret is unset, rather than verifying against a predictable empty key", async () => {
     const { mintRecordingToken } = await freshModule("test-only-recording-secret-do-not-use-in-prod");
-    const token = mintRecordingToken(42, 7);
+    const token = mintRecordingToken(42, 7, "12345");
 
     const { verifyRecordingToken: verifyWithNoSecret } = await freshModule("");
     expect(verifyWithNoSecret(token)).toBeNull();
@@ -64,14 +64,31 @@ describe("mintRecordingToken / verifyRecordingToken", () => {
 
   it("produces a different signature for a different secret", async () => {
     const { mintRecordingToken: mintA } = await freshModule("secret-a");
-    const tokenA = mintA(42, 7);
+    const tokenA = mintA(42, 7, "12345");
 
     const { mintRecordingToken: mintB } = await freshModule("secret-b");
-    const tokenB = mintB(42, 7);
+    const tokenB = mintB(42, 7, "12345");
 
     const [, signatureA] = tokenA.split(".");
     const [, signatureB] = tokenB.split(".");
     expect(signatureA).not.toBe(signatureB);
+  });
+});
+
+describe("recordingIdentityFromToken", () => {
+  beforeEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("returns the github_id for a valid token", async () => {
+    const { mintRecordingToken, recordingIdentityFromToken } = await freshModule("test-only-recording-secret-do-not-use-in-prod");
+    const token = mintRecordingToken(42, 7, "12345");
+    expect(recordingIdentityFromToken(token)).toBe("12345");
+  });
+
+  it("returns null for an invalid token", async () => {
+    const { recordingIdentityFromToken } = await freshModule("test-only-recording-secret-do-not-use-in-prod");
+    expect(recordingIdentityFromToken("not-a-real-token")).toBeNull();
   });
 });
 
@@ -86,14 +103,14 @@ describe("isAuthorizedRecordingRequest", () => {
 
   it("authorizes a request whose token repo_id matches the requested repo page", async () => {
     const { mintRecordingToken, isAuthorizedRecordingRequest } = await freshModule("test-only-recording-secret-do-not-use-in-prod");
-    const token = mintRecordingToken(42, 7);
+    const token = mintRecordingToken(42, 7, "12345");
     const request = requestFor(`/repos/42?recording_token=${token}`);
     expect(isAuthorizedRecordingRequest(request)).toBe(true);
   });
 
   it("rejects a token minted for a different repo than the one requested", async () => {
     const { mintRecordingToken, isAuthorizedRecordingRequest } = await freshModule("test-only-recording-secret-do-not-use-in-prod");
-    const token = mintRecordingToken(42, 7);
+    const token = mintRecordingToken(42, 7, "12345");
     const request = requestFor(`/repos/99?recording_token=${token}`);
     expect(isAuthorizedRecordingRequest(request)).toBe(false);
   });
@@ -106,14 +123,14 @@ describe("isAuthorizedRecordingRequest", () => {
 
   it("rejects a valid token used against a non-repo-detail path", async () => {
     const { mintRecordingToken, isAuthorizedRecordingRequest } = await freshModule("test-only-recording-secret-do-not-use-in-prod");
-    const token = mintRecordingToken(42, 7);
+    const token = mintRecordingToken(42, 7, "12345");
     const request = requestFor(`/settings?recording_token=${token}`);
     expect(isAuthorizedRecordingRequest(request)).toBe(false);
   });
 
   it("rejects a valid token used against a descendant path of the repo it's scoped to", async () => {
     const { mintRecordingToken, isAuthorizedRecordingRequest } = await freshModule("test-only-recording-secret-do-not-use-in-prod");
-    const token = mintRecordingToken(42, 7);
+    const token = mintRecordingToken(42, 7, "12345");
     const request = requestFor(`/repos/42/settings?recording_token=${token}`);
     expect(isAuthorizedRecordingRequest(request)).toBe(false);
   });

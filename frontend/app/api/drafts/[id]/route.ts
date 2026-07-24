@@ -4,5 +4,5 @@ import { proxyRoute } from "@/lib/route-handler";
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const payload = (await request.json()) as { status: "approved" | "rejected" };
-  return proxyRoute(() => api.reviewDraft(Number(id), payload.status));
+  return proxyRoute(request, () => api.reviewDraft(Number(id), payload.status));
 }

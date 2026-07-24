@@ -52,6 +52,7 @@ def test_trigger_demo_asset_url_carries_a_recording_token_scoped_to_the_repo(cli
 
     assert payload["repo_id"] == repo_id
     assert payload["user_id"] == seed_user
+    assert payload["github_id"] == "12345"
     assert isinstance(signature, str) and len(signature) == 64
 
 

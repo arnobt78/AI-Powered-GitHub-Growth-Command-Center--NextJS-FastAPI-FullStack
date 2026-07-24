@@ -18,10 +18,11 @@ function sign(payloadB64: string): string {
 // test-mint precedent in reverse. Production tokens are minted by the
 // backend (backend/app/recording_auth.py), from a verified Auth.js-free
 // server-side request, never by the browser.
-export function mintRecordingToken(repoId: number, userId: number): string {
+export function mintRecordingToken(repoId: number, userId: number, githubId: string): string {
   const payload = JSON.stringify({
     repo_id: repoId,
     user_id: userId,
+    github_id: githubId,
     exp: Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS,
   });
   const payloadB64 = Buffer.from(payload, "utf-8").toString("base64url");
@@ -32,7 +33,7 @@ export function mintRecordingToken(repoId: number, userId: number): string {
 // scoped to, or null on any failure (malformed, tampered, expired, missing
 // fields) — deliberately non-throwing since the caller (auth.ts's authorized
 // callback) just needs a yes/no gate, not exception handling per request.
-export function verifyRecordingToken(token: string): { repoId: number; userId: number } | null {
+export function verifyRecordingToken(token: string): { repoId: number; userId: number; githubId: string } | null {
   // Fail closed, not open: an unset secret must never make every token's
   // signature trivially forgeable (createHmac("sha256", "") is still a
   // valid, predictable key). A misconfigured deploy should break the
@@ -54,21 +55,26 @@ export function verifyRecordingToken(token: string): { repoId: number; userId: n
     return null;
   }
 
-  let payload: { repo_id?: unknown; user_id?: unknown; exp?: unknown };
+  let payload: { repo_id?: unknown; user_id?: unknown; github_id?: unknown; exp?: unknown };
   try {
     payload = JSON.parse(Buffer.from(payloadB64, "base64url").toString("utf-8"));
   } catch {
     return null;
   }
 
-  if (typeof payload.repo_id !== "number" || typeof payload.user_id !== "number" || typeof payload.exp !== "number") {
+  if (
+    typeof payload.repo_id !== "number" ||
+    typeof payload.user_id !== "number" ||
+    typeof payload.github_id !== "string" ||
+    typeof payload.exp !== "number"
+  ) {
     return null;
   }
   if (payload.exp < Math.floor(Date.now() / 1000)) {
     return null;
   }
 
-  return { repoId: payload.repo_id, userId: payload.user_id };
+  return { repoId: payload.repo_id, userId: payload.user_id, githubId: payload.github_id };
 }
 
 // Extracts the repo id from a /repos/{id}(...) pathname, or null if the path
@@ -85,10 +91,10 @@ function repoIdFromPathname(pathname: string): number | null {
 
 // The single check auth.ts's authorized callback delegates to: does this
 // request carry a valid, unexpired recording_token whose bound repo_id
-// matches the repo-detail page it's actually requesting? userId is part of
-// the signed payload (an audit trail of who triggered the recording) but
-// deliberately not enforced here — repo_id is the only scope this gate
-// grants or checks.
+// matches the repo-detail page it's actually requesting? This is the ONLY
+// place repo_id is enforced — it's what stops a captured token from being
+// used to browse a different repo's page. userId/githubId are part of the
+// signed payload but deliberately not checked here.
 export function isAuthorizedRecordingRequest(request: { nextUrl: URL }): boolean {
   const token = request.nextUrl.searchParams.get("recording_token");
   if (!token) {
@@ -100,4 +106,15 @@ export function isAuthorizedRecordingRequest(request: { nextUrl: URL }): boolean
   }
   const pathRepoId = repoIdFromPathname(request.nextUrl.pathname);
   return pathRepoId !== null && pathRepoId === verified.repoId;
+}
+
+// The identity a valid recording_token resolves to, for use by the data
+// layer (backendFetch, via request-identity.ts's AsyncLocalStorage) —
+// deliberately NOT repo-scoped like isAuthorizedRecordingRequest above.
+// Authorization for what data comes back is still fully enforced by the
+// backend's existing per-user query filtering; this only answers "who is
+// making this backend call," the same job a real Auth.js session's
+// githubId does everywhere else.
+export function recordingIdentityFromToken(token: string): string | null {
+  return verifyRecordingToken(token)?.githubId ?? null;
 }

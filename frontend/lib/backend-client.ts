@@ -1,6 +1,7 @@
 import "server-only";
 import { auth } from "@/auth";
 import { mintInternalUserToken } from "@/lib/internal-auth";
+import { getRecordingIdentity } from "@/lib/request-identity";
 
 const BASE_URL = process.env.BACKEND_URL ?? "http://localhost:8000";
 const API_KEY = process.env.BACKEND_API_KEY ?? "";
@@ -27,11 +28,14 @@ async function handleResponse<T>(res: Response): Promise<T> {
 
 // The authenticated fetcher — used by every existing api.ts method except
 // upsertUser. Automatically derives the signed internal user token from the
-// current Auth.js session, so every one of the 13 Route Handlers and every
+// current Auth.js session, so every one of the Route Handlers and every
 // page.tsx SSR prefetch call needs zero changes to become per-user scoped.
+// Falls back to the recording identity (see lib/request-identity.ts) when
+// there's no real session — set only when the current call is happening
+// inside DemoRecorder's headless-browser recording, never for a real user.
 export async function backendFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const session = await auth();
-  const githubId = session?.user?.id;
+  const githubId = session?.user?.id ?? getRecordingIdentity();
   if (!githubId) {
     throw new BackendError(401, "Not authenticated");
   }
