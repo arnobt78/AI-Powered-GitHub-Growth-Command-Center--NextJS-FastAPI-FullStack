@@ -21,6 +21,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       lang="en"
       suppressHydrationWarning
       data-scroll-behavior="smooth"
+      // Applying next/font/local's .variable classes here (not next/font/google)
+      // is what makes the preload/self-hosting actually take effect app-wide —
+      // globals.css's --font-sans/--font-mono just reference these variable names.
       className={`${geistSans.variable} ${geistMono.variable}`}
     >
       <body>

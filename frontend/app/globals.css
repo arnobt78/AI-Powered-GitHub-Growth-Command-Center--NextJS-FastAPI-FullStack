@@ -7,6 +7,10 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  /* --font-geist-sans/--font-geist-mono come from next/font/local (lib/fonts.ts),
+     applied via .variable classes on <html> in layout.tsx — this used to be a
+     dangling shadcn-scaffold self-reference (--font-sans: var(--font-sans)) that
+     silently fell back to the browser default font. */
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
