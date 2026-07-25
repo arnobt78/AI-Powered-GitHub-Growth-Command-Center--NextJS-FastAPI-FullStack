@@ -1,11 +1,19 @@
 "use client";
 
 import { Link2 } from "lucide-react";
+import type { ColumnDef } from "@tanstack/react-table";
+import { DataTable } from "@/components/ui/data-table";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useRepoReferrers } from "@/hooks/use-repo-referrers";
+import type { Referrer } from "@/lib/api-types";
+
+const columns: ColumnDef<Referrer>[] = [
+  { accessorKey: "referrer", header: "Source" },
+  { accessorKey: "count", header: "Views" },
+  { accessorKey: "uniques", header: "Uniques" },
+];
 
 export function ReferrersTable({ repoId }: { repoId: number }) {
   const { data: referrers, isPending } = useRepoReferrers(repoId);
@@ -18,24 +26,7 @@ export function ReferrersTable({ repoId }: { repoId: number }) {
       ) : referrers && referrers.length === 0 ? (
         <EmptyState icon={Link2} title="No referrer data yet" description="GitHub's traffic API is a rolling 14-day window." />
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Source</TableHead>
-              <TableHead>Views</TableHead>
-              <TableHead>Uniques</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {referrers?.map((r) => (
-              <TableRow key={r.id}>
-                <TableCell>{r.referrer}</TableCell>
-                <TableCell>{r.count}</TableCell>
-                <TableCell>{r.uniques}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <DataTable columns={columns} data={referrers ?? []} searchColumnId="referrer" searchPlaceholder="Search referrers..." />
       )}
     </div>
   );
