@@ -167,18 +167,21 @@
    Button's default/outline/secondary variants (which pair glass-interactive
    with bg-primary/bg-background/bg-secondary + border-transparent for their
    color identity) those utility classes win and paint over the glass
-   background/border; only the blur/shadow/hover-glow below actually render
-   on Button. This was checked deliberately (not missed) during Task 4's
+   background/border; only the shadow/hover-glow below actually render on
+   Button — backdrop-filter: blur() behind a fully opaque background is a
+   no-op (nothing behind it to blur), so the blur is inert there, not a
+   "frosted" effect; treat that inertness as a known, accepted compositing
+   cost, not a bug. This was checked deliberately (not missed) during Task 4's
    contrast pass: forcing full translucency onto Button via !important was
    tried and reverted, because it also made !important the base
    background-color permanently beat each variant's non-important
    hover:bg-*/80 utility, killing the hover color change entirely. The
    result as shipped is the better outcome for a *contrast* pass anyway —
    solid, opaque, high-contrast CTA buttons are correct for accessibility,
-   with blur+shadow+glow giving them a glass-adjacent frosted feel without
-   sacrificing legibility. Card/Chip/Input/Select have no competing
+   with the shadow/glow giving them a subtle glass-adjacent depth cue
+   without sacrificing legibility. Card/Chip/Input/Select have no competing
    background/border utility in their own classNames, so they get full
-   translucency as intended. */
+   translucency as intended, and the blur genuinely does something there. */
 @layer components {
   .glass {
     @apply backdrop-blur-md border;
