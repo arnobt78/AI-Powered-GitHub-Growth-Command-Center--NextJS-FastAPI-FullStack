@@ -27,6 +27,10 @@ export function OverviewClient() {
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {repos?.map((repo, index) => (
+            // Wraps RepoCard from the outside (rather than an index prop on
+            // RepoCard itself, which has no other reason to know its list
+            // position) — staggered mount, see lib/stagger.ts.
+            // motion-reduce:animate-none opts out for prefers-reduced-motion.
             <div
               key={repo.id}
               className="animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-backwards motion-reduce:animate-none"

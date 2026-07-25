@@ -62,6 +62,8 @@ export function RecommendationsClient() {
       ) : (
         <div className="space-y-2">
           {visible?.map((rec, index) => (
+            // Staggered mount (see lib/stagger.ts); motion-reduce:animate-none
+            // opts out for prefers-reduced-motion users.
             <Card
               key={rec.id}
               className="animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-backwards motion-reduce:animate-none"

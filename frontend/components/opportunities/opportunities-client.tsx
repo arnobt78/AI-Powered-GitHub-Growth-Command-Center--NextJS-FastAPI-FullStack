@@ -39,6 +39,8 @@ export function OpportunitiesClient() {
       ) : (
         <div className="space-y-2">
           {visible?.map((opp, index) => (
+            // Staggered mount (see lib/stagger.ts); motion-reduce:animate-none
+            // opts out for prefers-reduced-motion users.
             <Card
               key={opp.id}
               className="animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-backwards motion-reduce:animate-none"

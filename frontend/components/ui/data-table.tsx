@@ -86,6 +86,10 @@ export function DataTable<TData, TValue>({
         <TableBody>
           {table.getRowModel().rows.length > 0 ? (
             table.getRowModel().rows.map((row) => (
+              // Staggered mount using TanStack's own row.index (not a fresh
+              // counter, since a filtered row model's positions can differ
+              // from the underlying data array) — see lib/stagger.ts.
+              // motion-reduce:animate-none opts out for prefers-reduced-motion.
               <TableRow
                 key={row.id}
                 className="animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-backwards motion-reduce:animate-none"
