@@ -1,24 +1,21 @@
 "use client";
 
-import { ExternalLink, Eye, GitFork, Lightbulb, Star, Trash2 } from "lucide-react";
+import { ExternalLink, Eye, GitFork, Lightbulb, Star } from "lucide-react";
 import { Line, LineChart, ResponsiveContainer } from "recharts";
 import Link from "next/link";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DeltaBadge } from "@/components/ui/delta-badge";
 import { StatBadge } from "@/components/ui/stat-badge";
 import { SafeImage } from "@/components/safe-image";
+import { DeleteRepoButton } from "@/components/overview/delete-repo-button";
 import { useRepoSnapshots } from "@/hooks/use-repo-snapshots";
 import { useRepoInsights } from "@/hooks/use-repo-insights";
-import { useDeleteRepo } from "@/hooks/use-repos";
 import type { Repo } from "@/lib/api-types";
 
 export function RepoCard({ repo }: { repo: Repo }) {
   const { data: snapshots, isPending } = useRepoSnapshots(repo.id);
   const { data: insights } = useRepoInsights(repo.id);
-  const deleteRepo = useDeleteRepo();
 
   const latest = snapshots?.at(-1);
   const previous = snapshots?.at(-2);
@@ -38,19 +35,7 @@ export function RepoCard({ repo }: { repo: Repo }) {
           {repo.owner}/{repo.name}
           <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
         </Link>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={`Stop tracking ${repo.owner}/${repo.name}`}
-          onClick={() =>
-            deleteRepo.mutate(repo.id, {
-              onError: () => toast.error(`Could not stop tracking ${repo.owner}/${repo.name} — try again.`),
-            })
-          }
-          disabled={deleteRepo.isPending}
-        >
-          <Trash2 className="h-4 w-4 text-red-500" aria-hidden="true" />
-        </Button>
+        <DeleteRepoButton repo={repo} />
       </CardHeader>
       <CardContent className="space-y-3">
         {isPending ? (

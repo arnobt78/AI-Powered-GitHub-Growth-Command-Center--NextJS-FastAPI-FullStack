@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import SessionLocal, get_db
 from app.demo_asset_jobs import generate_demo_asset
-from app.deps import require_api_key, require_user
+from app.deps import get_owned_or_404, require_api_key, require_user
 from app.models import DemoAsset, Repo, User
 from app.rate_limit import limiter
 from app.recording_auth import mint_recording_token
@@ -33,20 +33,11 @@ class TriggerDemoAssetOut(BaseModel):
     status: str
 
 
-def _require_repo(repo_id: int, db: Session, current_user: User) -> Repo:
-    repo = db.execute(
-        select(Repo).where(Repo.id == repo_id, Repo.user_id == current_user.id)
-    ).scalars().first()
-    if repo is None:
-        raise HTTPException(status_code=404, detail="Repo not found")
-    return repo
-
-
 @router.get("/{repo_id}/demo-assets", response_model=list[DemoAssetOut])
 def list_demo_assets(
     repo_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_user)
 ) -> list[DemoAsset]:
-    _require_repo(repo_id, db, current_user)
+    get_owned_or_404(db, Repo, repo_id, current_user.id, "Repo")
     return db.execute(
         select(DemoAsset).where(DemoAsset.repo_id == repo_id).order_by(DemoAsset.created_at.desc())
     ).scalars().all()
@@ -61,7 +52,7 @@ def trigger_demo_asset(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_user),
 ) -> TriggerDemoAssetOut:
-    repo = _require_repo(repo_id, db, current_user)
+    repo = get_owned_or_404(db, Repo, repo_id, current_user.id, "Repo")
     asset = DemoAsset(user_id=current_user.id, repo_id=repo.id, status="generating")
     db.add(asset)
     db.commit()
@@ -89,10 +80,8 @@ video_router = APIRouter(prefix="/demo-assets", tags=["demo-assets"], dependenci
 def get_demo_asset_video(
     demo_asset_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_user)
 ) -> FileResponse:
-    asset = db.execute(
-        select(DemoAsset).where(DemoAsset.id == demo_asset_id, DemoAsset.user_id == current_user.id)
-    ).scalars().first()
-    if asset is None or asset.status != "ready" or not asset.video_path:
+    asset = get_owned_or_404(db, DemoAsset, demo_asset_id, current_user.id, "Demo asset")
+    if asset.status != "ready" or not asset.video_path:
         raise HTTPException(status_code=404, detail="Demo asset not found")
 
     settings = get_settings()

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Mail } from "lucide-react";
+import { Mail, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -41,6 +41,7 @@ export function NotificationSettingsCard() {
               aria-label="Notification fallback email"
             />
             <Button onClick={handleSave} disabled={updateMe.isPending}>
+              <Save className="h-4 w-4" aria-hidden="true" />
               Save
             </Button>
           </div>

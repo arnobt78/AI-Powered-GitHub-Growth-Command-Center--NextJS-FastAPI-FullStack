@@ -1,3 +1,4 @@
+import { Clock, Sparkles } from "lucide-react";
 import type {
   DraftKind,
   MissingDocSuggestionContent,
@@ -10,6 +11,19 @@ import { Chip } from "@/components/ui/chip";
 function Reason({ reason }: { reason: string | null }) {
   if (!reason) return null;
   return <p className="mt-2 text-xs text-muted-foreground">{reason}</p>;
+}
+
+// Shared by every kind's "Current"/"Suggested" field pair below instead of
+// repeating the same label markup per kind.
+function FieldLabel({ variant, children }: { variant: "current" | "suggested"; children: string }) {
+  const Icon = variant === "current" ? Clock : Sparkles;
+  const iconColor = variant === "current" ? "text-muted-foreground" : "text-violet-500";
+  return (
+    <p className="mb-1 flex items-center gap-1 text-xs font-medium text-muted-foreground">
+      <Icon className={`h-3 w-3 ${iconColor}`} aria-hidden="true" />
+      {children}
+    </p>
+  );
 }
 
 function isReadmeSuggestion(c: unknown): c is ReadmeSuggestionContent {
@@ -34,13 +48,13 @@ export function DraftContent({ kind, content }: { kind: DraftKind | string; cont
       <div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <p className="mb-1 text-xs font-medium text-muted-foreground">Current</p>
+            <FieldLabel variant="current">Current</FieldLabel>
             <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-md bg-muted/50 p-2 text-xs">
               {content.current ?? "(no README yet)"}
             </pre>
           </div>
           <div>
-            <p className="mb-1 text-xs font-medium text-muted-foreground">Suggested</p>
+            <FieldLabel variant="suggested">Suggested</FieldLabel>
             <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-md bg-muted/50 p-2 text-xs">{content.suggested}</pre>
           </div>
         </div>
@@ -90,7 +104,7 @@ export function DraftContent({ kind, content }: { kind: DraftKind | string; cont
       <div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <p className="mb-1 text-xs font-medium text-muted-foreground">Current</p>
+            <FieldLabel variant="current">Current</FieldLabel>
             <div className="flex flex-wrap gap-1.5">
               {content.current.length > 0
                 ? content.current.map((topic, i) => <Chip key={`${topic}-${i}`}>{topic}</Chip>)
@@ -98,7 +112,7 @@ export function DraftContent({ kind, content }: { kind: DraftKind | string; cont
             </div>
           </div>
           <div>
-            <p className="mb-1 text-xs font-medium text-muted-foreground">Suggested</p>
+            <FieldLabel variant="suggested">Suggested</FieldLabel>
             <div className="flex flex-wrap gap-1.5">
               {content.suggested.map((topic, i) => (
                 <Chip key={`${topic}-${i}`}>{topic}</Chip>
@@ -116,11 +130,11 @@ export function DraftContent({ kind, content }: { kind: DraftKind | string; cont
       <div className="space-y-1.5 text-sm">
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <p className="mb-1 text-xs font-medium text-muted-foreground">Current</p>
+            <FieldLabel variant="current">Current</FieldLabel>
             <p className="text-sm">{content.current ?? "(no description yet)"}</p>
           </div>
           <div>
-            <p className="mb-1 text-xs font-medium text-muted-foreground">Suggested</p>
+            <FieldLabel variant="suggested">Suggested</FieldLabel>
             <p className="text-sm">{content.suggested_description}</p>
           </div>
         </div>

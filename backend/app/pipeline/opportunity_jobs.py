@@ -26,11 +26,19 @@ def run_opportunities_pipeline_for_all_repos(db: Session, user_id: int | None = 
         if repo.user_id in failed_auth_user_ids:
             continue
 
+        # Captured before the try — see app.pipeline.jobs.run_pipeline_for_all_repos
+        # for why: db.rollback() below expires every session-tracked object, so a
+        # post-rollback `repo.user_id` access could itself raise.
+        repo_user_id = repo.user_id
         try:
-            owner = db.get(User, repo.user_id)
+            owner = db.get(User, repo_user_id)
             gh_client = GitHubClient(token=decrypt_token(owner.access_token_encrypted))
         except Exception:
-            failed_auth_user_ids.add(repo.user_id)
+            # Same CAPA-0001 rationale as app.pipeline.jobs.run_pipeline_for_all_repos:
+            # this shares PipelineRunner's db session, so roll back before the loop
+            # reuses it for the next repo.
+            db.rollback()
+            failed_auth_user_ids.add(repo_user_id)
             continue
 
         runner = PipelineRunner(

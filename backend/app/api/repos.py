@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.deps import require_api_key, require_user
+from app.deps import get_owned_or_404, require_api_key, require_user
 from app.events import broadcaster
 from app.models import Repo, User
 from app.rate_limit import limiter
@@ -62,12 +62,7 @@ def create_repo(
 def get_repo(
     repo_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_user)
 ) -> Repo:
-    repo = db.execute(
-        select(Repo).where(Repo.id == repo_id, Repo.user_id == current_user.id)
-    ).scalars().first()
-    if repo is None:
-        raise HTTPException(status_code=404, detail="Repo not found")
-    return repo
+    return get_owned_or_404(db, Repo, repo_id, current_user.id, "Repo")
 
 
 @router.delete("/{repo_id}", status_code=204)
@@ -76,11 +71,7 @@ def delete_repo(
     request: Request,
     repo_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_user)
 ) -> None:
-    repo = db.execute(
-        select(Repo).where(Repo.id == repo_id, Repo.user_id == current_user.id)
-    ).scalars().first()
-    if repo is None:
-        raise HTTPException(status_code=404, detail="Repo not found")
+    repo = get_owned_or_404(db, Repo, repo_id, current_user.id, "Repo")
     db.delete(repo)
     db.commit()
     broadcaster.publish("repo_removed", {"id": repo_id}, user_id=current_user.id)

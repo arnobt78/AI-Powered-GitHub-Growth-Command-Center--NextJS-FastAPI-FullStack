@@ -39,6 +39,23 @@ def test_trigger_content_run_requires_user_token(client_without_user_token):
     assert resp.status_code == 401
 
 
+def test_trigger_opportunities_run_returns_immediately_and_scopes_to_caller(client):
+    client.post("/repos", json={"owner": "octocat", "name": "hello-world"})
+
+    with patch("app.pipeline.opportunity_jobs.run_opportunities_pipeline_for_all_repos") as mock_run:
+        resp = client.post("/runs/opportunities")
+
+    assert resp.status_code == 202
+    assert resp.json() == {"status": "started"}
+    assert mock_run.call_count == 1
+    assert mock_run.call_args.kwargs["user_id"] == client.test_user_id
+
+
+def test_trigger_opportunities_run_requires_user_token(client_without_user_token):
+    resp = client_without_user_token.post("/runs/opportunities")
+    assert resp.status_code == 401
+
+
 def test_list_runs_exposes_pipeline_kind(client):
     from app.db import SessionLocal
     from app.models import PipelineRun

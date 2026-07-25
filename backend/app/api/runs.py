@@ -1,12 +1,12 @@
 from datetime import datetime
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import SessionLocal, get_db
-from app.deps import require_api_key, require_user
+from app.deps import get_owned_or_404, require_api_key, require_user
 from app.models import PipelineRun, StageRun, User
 from app.rate_limit import limiter
 
@@ -107,11 +107,7 @@ def _run_opportunities_pipeline_background(user_id: int) -> None:
 def list_run_stages(
     run_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_user)
 ) -> list[StageRun]:
-    run = db.execute(
-        select(PipelineRun).where(PipelineRun.id == run_id, PipelineRun.user_id == current_user.id)
-    ).scalars().first()
-    if run is None:
-        raise HTTPException(status_code=404, detail="Run not found")
+    get_owned_or_404(db, PipelineRun, run_id, current_user.id, "Run")
     return db.execute(
         select(StageRun).where(StageRun.pipeline_run_id == run_id).order_by(StageRun.id)
     ).scalars().all()

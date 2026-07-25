@@ -18,7 +18,7 @@ class ProviderStatusOut(BaseModel):
 
 
 @router.get("/status", response_model=list[ProviderStatusOut])
-def provider_status(db: Session = Depends(get_db)) -> list[dict]:
+def provider_status(db: Session = Depends(get_db)) -> list[ProviderStatusOut]:
     today = datetime.now(timezone.utc).date()
     rows = db.execute(select(LLMUsage).where(LLMUsage.date == today)).scalars().all()
-    return [{"provider": r.provider, "calls_today": r.call_count} for r in rows]
+    return [ProviderStatusOut(provider=r.provider, calls_today=r.call_count) for r in rows]

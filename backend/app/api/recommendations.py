@@ -1,12 +1,12 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.deps import require_api_key, require_user
+from app.deps import get_owned_or_404, require_api_key, require_user
 from app.events import broadcaster
 from app.models import Recommendation, User
 
@@ -48,13 +48,7 @@ def update_recommendation(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_user),
 ) -> Recommendation:
-    rec = db.execute(
-        select(Recommendation).where(
-            Recommendation.id == recommendation_id, Recommendation.user_id == current_user.id
-        )
-    ).scalars().first()
-    if rec is None:
-        raise HTTPException(status_code=404, detail="Recommendation not found")
+    rec = get_owned_or_404(db, Recommendation, recommendation_id, current_user.id, "Recommendation")
     rec.dismissed = payload.dismissed
     db.commit()
     db.refresh(rec)

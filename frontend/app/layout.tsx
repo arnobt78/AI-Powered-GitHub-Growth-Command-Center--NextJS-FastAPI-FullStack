@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { SessionProvider } from "next-auth/react";
 import { Toaster } from "@/components/ui/sonner";
+import { GithubIcon } from "@/components/icons/github-icon";
 import { NavSidebar } from "@/components/nav-sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { QueryProvider } from "@/providers/query-provider";
@@ -25,7 +26,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <NavSidebar />
                   <div className="flex-1">
                     <header className="flex items-center justify-between border-b px-6 py-3">
-                      <h1 className="text-base font-semibold">GitHub Growth Bot</h1>
+                      <h1 className="flex items-center gap-2 text-base font-semibold">
+                        <GithubIcon className="h-5 w-5" aria-hidden="true" />
+                        GitHub Growth Bot
+                      </h1>
                       <ThemeToggle />
                     </header>
                     <main className="p-6">{children}</main>

@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Filter, Lightbulb, X } from "lucide-react";
+import { CheckCircle2, Filter, Lightbulb, Tag, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,7 @@ export function RecommendationsClient() {
         <div className="flex flex-wrap items-center gap-2">
           <Filter className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           <Button variant={categoryFilter === null ? "default" : "outline"} size="sm" onClick={() => setCategoryFilter(null)}>
+            <Tag className="h-3.5 w-3.5" aria-hidden="true" />
             All
           </Button>
           {categories.map((category) => (
@@ -48,6 +49,7 @@ export function RecommendationsClient() {
               size="sm"
               onClick={() => setCategoryFilter(category)}
             >
+              <Tag className="h-3.5 w-3.5" aria-hidden="true" />
               {category}
             </Button>
           ))}

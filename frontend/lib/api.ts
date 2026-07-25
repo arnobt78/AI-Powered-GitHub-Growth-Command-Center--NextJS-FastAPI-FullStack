@@ -1,4 +1,4 @@
-import { backendFetch, backendFetchSystem } from "@/lib/backend-client";
+import { backendFetch } from "@/lib/backend-client";
 import type {
   Benchmark,
   DemoAsset,
@@ -15,7 +15,6 @@ import type {
   Snapshot,
   StageRun,
   UserOut,
-  UserUpsert,
 } from "@/lib/api-types";
 
 export const api = {
@@ -62,12 +61,6 @@ export const api = {
   triggerContentRun: () => backendFetch<{ status: string }>("/runs/content", { method: "POST" }),
 
   providerStatus: () => backendFetch<ProviderStatus[]>("/providers/status"),
-
-  upsertUser: (payload: UserUpsert) =>
-    backendFetchSystem<UserOut>("/users/upsert", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
 
   getMe: () => backendFetch<UserOut>("/users/me"),
   updateMe: (payload: { notification_email: string | null }) =>

@@ -1,12 +1,12 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.deps import require_api_key, require_user
+from app.deps import get_owned_or_404, require_api_key, require_user
 from app.events import broadcaster
 from app.models import Opportunity, User
 
@@ -47,13 +47,7 @@ def update_opportunity(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_user),
 ) -> Opportunity:
-    opp = db.execute(
-        select(Opportunity).where(
-            Opportunity.id == opportunity_id, Opportunity.user_id == current_user.id
-        )
-    ).scalars().first()
-    if opp is None:
-        raise HTTPException(status_code=404, detail="Opportunity not found")
+    opp = get_owned_or_404(db, Opportunity, opportunity_id, current_user.id, "Opportunity")
     opp.dismissed = payload.dismissed
     db.commit()
     db.refresh(opp)

@@ -7,16 +7,22 @@ import { queryKeys } from "@/lib/query-keys";
 
 const EVENT_QUERY_MAP: Record<string, QueryKey[]> = {
   repo_added: [queryKeys.repos.all],
-  // Backend cascades repo deletion to that repo's recommendations/drafts (ON DELETE
-  // CASCADE) — other open tabs need those inboxes invalidated too, not just the repo list.
-  repo_removed: [queryKeys.repos.all, queryKeys.recommendations.all, queryKeys.drafts.all],
+  // Backend cascades repo deletion to that repo's recommendations/drafts/opportunities
+  // (ON DELETE CASCADE) — other open tabs need those inboxes invalidated too, not just
+  // the repo list.
+  repo_removed: [queryKeys.repos.all, queryKeys.recommendations.all, queryKeys.drafts.all, queryKeys.opportunities.all],
   // Payload only carries {id, dismissed} (no repo_id — see backend app/api/recommendations.py),
   // so we can't target one repo's insights key; invalidate repos.all (prefix-matches
   // ["repos", id, "insights"] too) to refresh the recommendation_count badge everywhere.
   recommendation_updated: [queryKeys.recommendations.all, queryKeys.repos.all],
-  run_completed: [queryKeys.runs.all, queryKeys.repos.all, queryKeys.recommendations.all],
+  // The analytics and content pipelines are the only place LLMUsage rows change
+  // (Synthesizer / ContentSynthesizer / ContentValidator make the actual LLM
+  // calls) — the opportunities pipeline's stages never touch LLMRouter — so the
+  // Settings provider-status table rides only these two completion events
+  // instead of polling; there's no per-call event to key off of.
+  run_completed: [queryKeys.runs.all, queryKeys.repos.all, queryKeys.recommendations.all, queryKeys.providers.status],
   draft_updated: [queryKeys.drafts.all],
-  drafts_generated: [queryKeys.drafts.all, queryKeys.runs.all],
+  drafts_generated: [queryKeys.drafts.all, queryKeys.runs.all, queryKeys.providers.status],
   opportunities_generated: [queryKeys.opportunities.all, queryKeys.runs.all],
   opportunity_updated: [queryKeys.opportunities.all],
   // Payload only carries {id, status} where id is the demo asset id, not a repo_id

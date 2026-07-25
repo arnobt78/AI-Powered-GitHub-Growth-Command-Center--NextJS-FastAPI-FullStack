@@ -26,24 +26,28 @@ export default async function RepoDetailPage({
   return runWithRecordingToken(recordingToken, async () => {
     const queryClient = new QueryClient();
 
+    // getRepo is independent of the other 6 prefetches (none of them depend on the
+    // resolved repo object), so it belongs in the same Promise.all rather than being
+    // awaited first. Not routed through queryClient — nothing reads repo out of the
+    // TanStack cache, RepoDetailClient takes it as a plain prop — so a bare call keeps
+    // this to one fewer moving part than a fetchQuery into an otherwise-unused key.
     let repo;
     try {
-      repo = await api.getRepo(repoId);
+      [repo] = await Promise.all([
+        api.getRepo(repoId),
+        queryClient.prefetchQuery({ queryKey: queryKeys.repos.snapshots(repoId), queryFn: () => api.listSnapshots(repoId) }),
+        queryClient.prefetchQuery({ queryKey: queryKeys.repos.benchmarks(repoId), queryFn: () => api.listBenchmarks(repoId) }),
+        queryClient.prefetchQuery({ queryKey: queryKeys.repos.referrers(repoId), queryFn: () => api.listReferrers(repoId) }),
+        queryClient.prefetchQuery({ queryKey: queryKeys.repos.popularPaths(repoId), queryFn: () => api.listPopularPaths(repoId) }),
+        queryClient.prefetchQuery({ queryKey: queryKeys.recommendations.all, queryFn: () => api.listRecommendations() }),
+        queryClient.prefetchQuery({ queryKey: queryKeys.demoAssets.forRepo(repoId), queryFn: () => api.listDemoAssets(repoId) }),
+      ]);
     } catch (error) {
       if (error instanceof BackendError && error.status === 404) {
         notFound();
       }
       throw error;
     }
-
-    await Promise.all([
-      queryClient.prefetchQuery({ queryKey: queryKeys.repos.snapshots(repoId), queryFn: () => api.listSnapshots(repoId) }),
-      queryClient.prefetchQuery({ queryKey: queryKeys.repos.benchmarks(repoId), queryFn: () => api.listBenchmarks(repoId) }),
-      queryClient.prefetchQuery({ queryKey: queryKeys.repos.referrers(repoId), queryFn: () => api.listReferrers(repoId) }),
-      queryClient.prefetchQuery({ queryKey: queryKeys.repos.popularPaths(repoId), queryFn: () => api.listPopularPaths(repoId) }),
-      queryClient.prefetchQuery({ queryKey: queryKeys.recommendations.all, queryFn: () => api.listRecommendations() }),
-      queryClient.prefetchQuery({ queryKey: queryKeys.demoAssets.forRepo(repoId), queryFn: () => api.listDemoAssets(repoId) }),
-    ]);
 
     return (
       <HydrationBoundary state={dehydrate(queryClient)}>

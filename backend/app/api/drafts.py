@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.deps import require_api_key, require_user
+from app.deps import get_owned_or_404, require_api_key, require_user
 from app.events import broadcaster
 from app.github_client import GitHubClient
 from app.models import Draft, Repo, User
@@ -48,11 +48,7 @@ def review_draft(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_user),
 ) -> Draft:
-    draft = db.execute(
-        select(Draft).where(Draft.id == draft_id, Draft.user_id == current_user.id)
-    ).scalars().first()
-    if draft is None:
-        raise HTTPException(status_code=404, detail="Draft not found")
+    draft = get_owned_or_404(db, Draft, draft_id, current_user.id, "Draft")
     if draft.status != "pending":
         raise HTTPException(status_code=409, detail="Draft has already been reviewed")
 

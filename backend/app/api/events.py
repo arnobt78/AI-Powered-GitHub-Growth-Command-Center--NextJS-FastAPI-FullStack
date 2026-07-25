@@ -11,7 +11,7 @@ router = APIRouter(tags=["events"], dependencies=[Depends(require_api_key)])
 
 
 @router.get("/events")
-async def stream_events(current_user: User = Depends(require_user)):
+async def stream_events(current_user: User = Depends(require_user)) -> EventSourceResponse:
     queue = broadcaster.subscribe(user_id=current_user.id)
 
     async def event_generator():

@@ -164,6 +164,37 @@ def test_cleanup_deletes_expired_assets_and_files(mock_os_remove, mock_os_exists
     db.close()
 
 
+@patch("app.demo_asset_jobs.broadcaster.publish")
+@patch("app.demo_asset_jobs.os.path.exists")
+@patch("app.demo_asset_jobs.os.remove")
+def test_cleanup_publishes_demo_asset_updated_per_deleted_asset(mock_os_remove, mock_os_exists, mock_publish, seed_user):
+    db = SessionLocal()
+    repo = Repo(owner="octocat", name="hello-world", user_id=seed_user)
+    db.add(repo)
+    db.commit()
+    db.refresh(repo)
+
+    old_asset = DemoAsset(
+        user_id=seed_user, repo_id=repo.id, status="ready", video_path="old.mp4",
+        created_at=datetime.now(timezone.utc) - timedelta(days=5),
+    )
+    recent_asset = DemoAsset(
+        user_id=seed_user, repo_id=repo.id, status="ready", video_path="recent.mp4",
+        created_at=datetime.now(timezone.utc) - timedelta(hours=1),
+    )
+    db.add_all([old_asset, recent_asset])
+    db.commit()
+    old_id = old_asset.id
+
+    cleanup_expired_demo_assets(db)
+
+    # Only the expired asset was deleted, so exactly one publish — proves the
+    # still-live recent_asset gets no event, and the id/user_id are captured
+    # correctly before delete/commit expired the ORM objects.
+    mock_publish.assert_called_once_with("demo_asset_updated", {"id": old_id, "status": "expired"}, user_id=seed_user)
+    db.close()
+
+
 @patch("app.demo_asset_jobs.os.path.exists")
 @patch("app.demo_asset_jobs.os.remove")
 def test_cleanup_deletes_failed_assets_with_no_file(mock_os_remove, mock_os_exists, seed_user):

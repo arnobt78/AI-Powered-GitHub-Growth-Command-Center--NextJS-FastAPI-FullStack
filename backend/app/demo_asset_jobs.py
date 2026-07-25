@@ -46,6 +46,9 @@ def cleanup_expired_demo_assets(db: Session) -> None:
     settings = get_settings()
     cutoff = datetime.now(timezone.utc) - timedelta(days=settings.demo_asset_retention_days)
     expired = db.query(DemoAsset).filter(DemoAsset.created_at < cutoff).all()
+    # Capture (id, user_id) before delete/commit expires the ORM objects, so the
+    # SSE broadcast below has something to publish with.
+    deleted = [(asset.id, asset.user_id) for asset in expired]
     for asset in expired:
         if asset.video_path:
             full_path = os.path.join(settings.demo_assets_dir, asset.video_path)
@@ -53,3 +56,9 @@ def cleanup_expired_demo_assets(db: Session) -> None:
                 os.remove(full_path)
         db.delete(asset)
     db.commit()
+
+    # Without this, an open repo-detail tab keeps showing an expired asset (and a
+    # video link that now 404s) until a manual refresh — this job runs on a
+    # schedule, not from a user action in any open tab.
+    for asset_id, user_id in deleted:
+        broadcaster.publish("demo_asset_updated", {"id": asset_id, "status": "expired"}, user_id=user_id)

@@ -46,8 +46,13 @@ def run_pipeline_for_all_repos(db: Session, user_id: int | None = None, notify: 
         if repo.user_id in failed_auth_user_ids:
             continue
 
+        # Captured before the try — db.rollback() below expires every object
+        # tracked by the session, so a post-rollback `repo.user_id` access would
+        # re-SELECT and could itself raise (e.g. the repo row is gone), escaping
+        # this handler whose entire purpose is not aborting the batch.
+        repo_user_id = repo.user_id
         try:
-            owner = db.get(User, repo.user_id)
+            owner = db.get(User, repo_user_id)
             gh_client = GitHubClient(token=decrypt_token(owner.access_token_encrypted))
         except Exception:
             # Owner lookup / token decryption happens outside PipelineRunner's own
@@ -56,7 +61,11 @@ def run_pipeline_for_all_repos(db: Session, user_id: int | None = None, notify: 
             # (corrupted ciphertext, rotated encryption key) must be caught here
             # explicitly — otherwise it would propagate and abort every other
             # tenant's repos still queued in this same batch.
-            failed_auth_user_ids.add(repo.user_id)
+            # Same CAPA-0001 rationale as PipelineRunner.run_for_repo's own handler:
+            # this shares that runner's db session, so a DB-poisoning exception here
+            # must be rolled back before the loop reuses the session for the next repo.
+            db.rollback()
+            failed_auth_user_ids.add(repo_user_id)
             continue
 
         runner = PipelineRunner(stages=build_stages(db, gh_client, llm_router), db_session=db)

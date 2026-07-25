@@ -48,6 +48,11 @@ def test_run_stages_returns_404_for_unknown_run(client):
     assert client.get("/runs/999999/stages").status_code == 404
 
 
+def test_run_stages_returns_404_for_other_users_run(client, other_user_client):
+    run_id = _seed_run_with_stages(other_user_client.test_user_id)
+    assert client.get(f"/runs/{run_id}/stages").status_code == 404
+
+
 def test_recommendation_out_includes_created_at(client, seed_user):
     repo_resp = client.post("/repos", json={"owner": "octocat", "name": "hello-world"})
     repo_id = repo_resp.json()["id"]

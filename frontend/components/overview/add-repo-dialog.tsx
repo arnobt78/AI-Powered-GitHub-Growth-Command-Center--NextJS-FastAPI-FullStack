@@ -67,7 +67,10 @@ export function AddRepoDialog() {
       <DialogContent className="flex h-[85vh] w-[85vw] max-w-[85vw] flex-col sm:max-w-[85vw]">
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
           <DialogHeader>
-            <DialogTitle>Track a new repo</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="h-4 w-4 text-sky-500" aria-hidden="true" />
+              Track a new repo
+            </DialogTitle>
           </DialogHeader>
           <div className="flex flex-1 flex-col gap-4 overflow-y-auto py-4">
             <div className="grid gap-2">
@@ -95,6 +98,7 @@ export function AddRepoDialog() {
           </div>
           <DialogFooter>
             <Button type="submit" disabled={addRepo.isPending}>
+              <Plus className="h-4 w-4" aria-hidden="true" />
               {addRepo.isPending ? "Adding..." : "Add"}
             </Button>
           </DialogFooter>
