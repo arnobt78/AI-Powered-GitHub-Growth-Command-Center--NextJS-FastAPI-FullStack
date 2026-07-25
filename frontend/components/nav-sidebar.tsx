@@ -5,6 +5,7 @@ import { signOut } from "next-auth/react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { toast } from "sonner";
 import { SafeImage } from "@/components/safe-image";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +17,14 @@ const NAV_ITEMS = [
   { href: "/opportunities", label: "Opportunities", icon: Radar, color: "text-rose-500" },
   { href: "/settings", label: "Settings", icon: Settings, color: "text-slate-500" },
 ];
+
+// Fires the goodbye toast before signOut() navigates away — the redirect to
+// /sign-in unmounts this component immediately after, so the toast must be
+// queued first or it never has a chance to render.
+function handleSignOut(name: string | null | undefined) {
+  toast.success(`Goodbye, ${name ?? "there"} 👋`, { description: "Hope to see you again soon — happy coding!" });
+  signOut({ callbackUrl: "/sign-in" });
+}
 
 export function NavSidebar() {
   const pathname = usePathname();
@@ -52,7 +61,7 @@ export function NavSidebar() {
           <span className="flex-1 truncate text-sm font-medium">{session.user.name}</span>
           <button
             type="button"
-            onClick={() => signOut({ callbackUrl: "/sign-in" })}
+            onClick={() => handleSignOut(session.user.name)}
             aria-label="Sign out"
             className="rounded-md p-1.5 hover:bg-muted/50"
           >
