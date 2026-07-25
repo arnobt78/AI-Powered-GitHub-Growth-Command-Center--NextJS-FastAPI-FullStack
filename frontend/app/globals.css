@@ -85,6 +85,13 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  /* color-mix(in oklch, ...) derives glass tokens from existing theme tokens
+     (--card/--border/--foreground/--primary) instead of hardcoded rgba values,
+     so glass surfaces stay in sync automatically if the theme palette changes. */
+  --glass-bg: color-mix(in oklch, var(--card) 72%, transparent);
+  --glass-border: color-mix(in oklch, var(--border) 60%, transparent);
+  --glass-shadow: 0 8px 32px 0 color-mix(in oklch, var(--foreground) 8%, transparent);
+  --glass-glow: 0 0 0 1px color-mix(in oklch, var(--primary) 15%, transparent);
 }
 
 .dark {
@@ -119,6 +126,13 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  /* Dark mode mixes against black/lower card opacity rather than the light
+     values above — a straight opacity-only glass surface reads as too washed
+     out on dark backgrounds, so the mix ratios and shadow base differ here. */
+  --glass-bg: color-mix(in oklch, var(--card) 55%, transparent);
+  --glass-border: color-mix(in oklch, var(--border) 40%, transparent);
+  --glass-shadow: 0 8px 32px 0 color-mix(in oklch, black 40%, transparent);
+  --glass-glow: 0 0 0 1px color-mix(in oklch, var(--primary) 25%, transparent);
 }
 
 @layer base {
@@ -130,5 +144,36 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+/* Shared glassmorphism primitives for Phase 3 visual polish (Task 3 applies
+   these to shadcn UI primitives — cards, panels, dialogs). Kept as a
+   component layer instead of duplicating backdrop-blur/border/shadow inline
+   on every consumer, so the glass look stays visually consistent and themeable
+   from one place.
+
+   .glass-interactive repeats .glass's declarations rather than `@apply glass`:
+   Tailwind v4 only lets @apply reference real utilities (built-in, or classes
+   registered via @utility), not plain @layer components selectors — chaining
+   `@apply glass` here throws "Cannot apply unknown utility class `glass`" at
+   build time. Promoting these to @utility blocks to enable that composition
+   would pull in variant-sorting machinery neither class needs, so the small
+   duplicated block is the simpler fix. */
+@layer components {
+  .glass {
+    @apply backdrop-blur-md border;
+    background-color: var(--glass-bg);
+    border-color: var(--glass-border);
+    box-shadow: var(--glass-shadow);
+  }
+  .glass-interactive {
+    @apply backdrop-blur-md border transition-shadow duration-200;
+    background-color: var(--glass-bg);
+    border-color: var(--glass-border);
+    box-shadow: var(--glass-shadow);
+  }
+  .glass-interactive:hover {
+    box-shadow: var(--glass-shadow), var(--glass-glow);
   }
 }
