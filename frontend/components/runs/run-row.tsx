@@ -23,10 +23,25 @@ const KIND_META = {
 // build_stages / build_content_stages / opportunities stage list) — knowing
 // the order lets the UI infer "which stage is active right now" from just
 // the set of already-completed stage names, with no separate "started" event.
+// NOTE: only `analytics` stage names are unprefixed (backend/app/pipeline/*.py
+// -> name = "extractor", etc). `content` and `opportunities` stages are
+// prefixed by their pipeline kind (backend/app/pipeline/content/*.py -> name =
+// "content_extractor", etc; backend/app/pipeline/opportunities/*.py -> name =
+// "opportunity_extractor" / "opportunity_assembler") — StageRun.stage_name and
+// the stage_completed SSE payload both come straight from Stage.name
+// (backend/app/pipeline/runner.py), so these strings must match exactly.
 const STAGE_ORDER: Record<keyof typeof KIND_META, string[]> = {
   analytics: ["extractor", "preprocessor", "analyzer", "optimizer", "synthesizer", "validator", "assembler"],
-  content: ["extractor", "analyzer", "preprocessor", "optimizer", "synthesizer", "validator", "assembler"],
-  opportunities: ["extractor", "assembler"],
+  content: [
+    "content_extractor",
+    "content_analyzer",
+    "content_preprocessor",
+    "content_optimizer",
+    "content_synthesizer",
+    "content_validator",
+    "content_assembler",
+  ],
+  opportunities: ["opportunity_extractor", "opportunity_assembler"],
 };
 
 export function RunRow({ run }: { run: PipelineRun }) {
