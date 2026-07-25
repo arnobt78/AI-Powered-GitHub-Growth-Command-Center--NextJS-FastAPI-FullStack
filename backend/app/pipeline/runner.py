@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
+from app.events import broadcaster
 from app.models import PipelineRun, Repo, StageRun
 from app.pipeline.base import PipelineContext, Stage
 
@@ -53,6 +54,16 @@ class PipelineRunner:
                 error=error_text,
             ))
             self.db.commit()
+
+            # Broadcast-only — no new column, no schema change. The frontend
+            # infers "which stage is currently active" from the sequence of
+            # these events plus the run's own known stage order, rather than
+            # needing a separate "stage started" signal.
+            broadcaster.publish(
+                "stage_completed",
+                {"run_id": run_row.id, "stage_name": stage.name, "status": status},
+                user_id=repo.user_id,
+            )
 
         run_row.status = "degraded" if had_error else "ok"
         run_row.finished_at = datetime.now(timezone.utc)

@@ -37,7 +37,10 @@ def test_runs_opportunities_pipeline_and_publishes_per_user(mock_hn_cls, mock_gh
     assert len(opportunities) == 1
     assert opportunities[0].source == "github_discussions"
 
-    mock_publish.assert_called_once_with("opportunities_generated", {}, user_id=seed_user)
+    # assert_any_call, not assert_called_once_with: the patch target is the shared
+    # broadcaster singleton, so this mock also captures runner.py's per-stage
+    # stage_completed broadcasts now that those exist (Phase 3 Task 10).
+    mock_publish.assert_any_call("opportunities_generated", {}, user_id=seed_user)
     db.close()
 
 

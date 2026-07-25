@@ -59,7 +59,10 @@ def test_runs_content_pipeline_and_publishes_per_user(mock_llm_cls, mock_gh_cls,
     drafts = db.query(Draft).filter_by(repo_id=repo.id).all()
     assert len(drafts) >= 1  # at least the readme_suggestion task
 
-    mock_publish.assert_called_once_with("drafts_generated", {}, user_id=seed_user)
+    # assert_any_call, not assert_called_once_with: the patch target is the shared
+    # broadcaster singleton, so this mock also captures runner.py's per-stage
+    # stage_completed broadcasts now that those exist (Phase 3 Task 10).
+    mock_publish.assert_any_call("drafts_generated", {}, user_id=seed_user)
     db.close()
 
 

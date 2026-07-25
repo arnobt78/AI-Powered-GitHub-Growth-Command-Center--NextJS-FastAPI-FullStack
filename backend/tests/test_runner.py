@@ -1,4 +1,6 @@
 # backend/tests/test_runner.py
+from unittest.mock import patch
+
 from app.db import SessionLocal
 from app.models import PipelineRun, Recommendation, Repo, Snapshot, StageRun
 from app.pipeline.base import PipelineContext, Stage
@@ -145,4 +147,22 @@ def test_runner_uses_custom_context_factory_and_pipeline_kind(seed_user):
     assert ctx.raw["saw_repo_id"] == repo.id
     run_row = db.query(PipelineRun).first()
     assert run_row.pipeline_kind == "content"
+    db.close()
+
+
+@patch("app.pipeline.runner.broadcaster.publish")
+def test_runner_publishes_stage_completed_per_stage(mock_publish, seed_user):
+    db, repo = _db(seed_user)
+    runner = PipelineRunner(stages=[_BoomStage(), _SetsNormalizedStage()], db_session=db)
+
+    runner.run_for_repo(repo)
+    run_id = db.query(PipelineRun).first().id
+
+    assert mock_publish.call_count == 2
+    mock_publish.assert_any_call(
+        "stage_completed", {"run_id": run_id, "stage_name": "boom", "status": "error"}, user_id=seed_user
+    )
+    mock_publish.assert_any_call(
+        "stage_completed", {"run_id": run_id, "stage_name": "sets_normalized", "status": "ok"}, user_id=seed_user
+    )
     db.close()
