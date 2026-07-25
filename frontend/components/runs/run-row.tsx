@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, BarChart3, CheckCircle2, ChevronDown, ChevronRight, Loader2, Radar, Sparkles } from "lucide-react";
+import { AlertTriangle, BarChart3, CheckCircle2, ChevronDown, ChevronRight, Circle, Loader2, Radar, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,13 +19,27 @@ const KIND_META = {
   opportunities: { icon: Radar, color: "text-rose-500", label: "Opportunities" },
 } as const;
 
+// Stages run strictly in this declared order (mirrors the backend's
+// build_stages / build_content_stages / opportunities stage list) — knowing
+// the order lets the UI infer "which stage is active right now" from just
+// the set of already-completed stage names, with no separate "started" event.
+const STAGE_ORDER: Record<keyof typeof KIND_META, string[]> = {
+  analytics: ["extractor", "preprocessor", "analyzer", "optimizer", "synthesizer", "validator", "assembler"],
+  content: ["extractor", "analyzer", "preprocessor", "optimizer", "synthesizer", "validator", "assembler"],
+  opportunities: ["extractor", "assembler"],
+};
+
 export function RunRow({ run }: { run: PipelineRun }) {
   const [expanded, setExpanded] = useState(false);
   const { data: stages, isPending } = useRunStages(run.id, expanded);
   const meta = STATUS_META[run.status as keyof typeof STATUS_META] ?? STATUS_META.running;
   const StatusIcon = meta.icon;
-  const kindMeta = KIND_META[run.pipeline_kind as keyof typeof KIND_META] ?? KIND_META.analytics;
+  const kindKey = (run.pipeline_kind as keyof typeof KIND_META) in KIND_META ? (run.pipeline_kind as keyof typeof KIND_META) : "analytics";
+  const kindMeta = KIND_META[kindKey];
   const KindIcon = kindMeta.icon;
+
+  const completedNames = new Set(stages?.map((s) => s.stage_name));
+  const nextPendingIndex = STAGE_ORDER[kindKey].findIndex((name) => !completedNames.has(name));
 
   return (
     <Card>
@@ -54,18 +68,40 @@ export function RunRow({ run }: { run: PipelineRun }) {
             {isPending ? (
               <Skeleton className="h-20 w-full" />
             ) : (
-              stages?.map((stage) => (
-                <div key={stage.id} className="text-sm">
-                  <div className="flex items-center justify-between">
-                    <span>{stage.stage_name}</span>
-                    <span className="flex items-center gap-2 text-muted-foreground">
-                      {stage.duration_ms}ms
-                      <span className={stage.status === "ok" ? "text-emerald-500" : "text-red-500"}>{stage.status}</span>
-                    </span>
+              STAGE_ORDER[kindKey].map((stageName, index) => {
+                const stageRow = stages?.find((s) => s.stage_name === stageName);
+                const isActive = run.status === "running" && index === nextPendingIndex;
+                const isPendingStage = run.status === "running" && index > nextPendingIndex;
+
+                if (stageRow) {
+                  return (
+                    <div key={stageName} className="text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" aria-hidden="true" />
+                          {stageRow.stage_name}
+                        </span>
+                        <span className="flex items-center gap-2 text-muted-foreground">
+                          {stageRow.duration_ms}ms
+                          <span className={stageRow.status === "ok" ? "text-emerald-500" : "text-red-500"}>{stageRow.status}</span>
+                        </span>
+                      </div>
+                      {stageRow.error && <p className="mt-0.5 text-xs text-red-500">{stageRow.error}</p>}
+                    </div>
+                  );
+                }
+
+                return (
+                  <div key={stageName} className={`flex items-center gap-1.5 text-sm ${isPendingStage ? "text-muted-foreground/50" : ""}`}>
+                    {isActive ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-sky-500" aria-hidden="true" />
+                    ) : (
+                      <Circle className="h-3.5 w-3.5 text-muted-foreground/40" aria-hidden="true" />
+                    )}
+                    <span className={isActive ? "font-medium text-sky-500" : ""}>{stageName}</span>
                   </div>
-                  {stage.error && <p className="mt-0.5 text-xs text-red-500">{stage.error}</p>}
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         )}
