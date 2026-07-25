@@ -176,27 +176,33 @@
    choice for Button, just whatever backdrop-filter happens to do given
    each variant's own background opacity — treat it as an accepted,
    unexamined compositing cost, not a bug. This was checked deliberately
-   (not missed) during Task 4's
-   contrast pass: forcing full translucency onto Button via !important was
-   tried and reverted, because it also made !important the base
-   background-color permanently beat each variant's non-important hover
-   background-opacity utility, killing the hover color change entirely. The
-   result as shipped is the better outcome for a contrast pass anyway —
-   solid, opaque, high-contrast CTA buttons are correct for accessibility,
-   with the shadow/glow giving them a subtle glass-adjacent depth cue
-   without sacrificing legibility. Card/Chip/Input/Select have no competing
-   background/border utility in their own classNames, so they get full
-   translucency as intended, and the blur genuinely does something there.
+   (not missed) during Task 4's contrast pass: forcing full translucency
+   onto Button via !important was tried and reverted, because it also made
+   !important the base background-color permanently beat each variant's
+   non-important hover background-opacity utility, killing the hover color
+   change entirely. The result as shipped is the better outcome for a
+   contrast pass anyway — solid, opaque, high-contrast CTA buttons are
+   correct for accessibility, with the shadow/glow giving them a subtle
+   glass-adjacent depth cue without sacrificing legibility. Card/Chip/
+   Input/Select have no competing background/border utility in their own
+   classNames, so they get full translucency as intended, and the blur
+   genuinely does something there.
 
-   IMPORTANT: this comment block must never contain a literal `*/` sequence
-   (e.g. spelling out a Tailwind opacity-modifier class like bg-primary/80
-   verbatim) — CSS comments have no escape mechanism, so `*/` anywhere inside
-   ends the comment immediately, and everything after it (previously
-   including the @layer components rule below) gets parsed as a garbage
-   selector instead of a rule. This exact mistake shipped silently for
-   several commits — the .glass/.glass-interactive rules compiled to a
-   no-op selector and never applied to anything, in every build, until this
-   comment was rewritten to avoid the sequence. */
+   IMPORTANT — read before editing this comment block: a CSS block comment
+   ends the instant its content contains an asterisk immediately followed
+   by a forward slash, with no escape mechanism available. Do not spell out
+   that two-character terminator anywhere in this prose, even inside code
+   font or backticks, and do not write out any Tailwind opacity-modifier
+   class name (the kind written as a utility name, a slash, then a number)
+   verbatim near the word "asterisk" or near a literal asterisk character.
+   Twice now, editing this exact comment accidentally closed it early,
+   silently turning the two selectors below into part of a garbage
+   selector — compiling to declarations that exist but attach to nothing,
+   so the glassmorphism system quietly did nothing in every build until
+   caught by a real compile of this file, not by lint, typecheck, tests, or
+   next build (none of which parse compiled CSS). See the compile-time
+   regression test guarding this in frontend/tests/globals-css.test.ts —
+   if you must change this comment, run that test before committing. */
 @layer components {
   .glass {
     @apply backdrop-blur-md border;
