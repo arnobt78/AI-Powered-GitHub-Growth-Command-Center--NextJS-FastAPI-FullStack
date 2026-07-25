@@ -7,6 +7,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { QueryProvider } from "@/providers/query-provider";
 import { LiveEventsProvider } from "@/providers/live-events-provider";
 import { ThemeProvider } from "@/providers/theme-provider";
+import { geistSans, geistMono } from "@/lib/fonts";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -16,7 +17,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth">
+    <html
+      lang="en"
+      suppressHydrationWarning
+      data-scroll-behavior="smooth"
+      className={`${geistSans.variable} ${geistMono.variable}`}
+    >
       <body>
         <SessionProvider>
           <ThemeProvider>
