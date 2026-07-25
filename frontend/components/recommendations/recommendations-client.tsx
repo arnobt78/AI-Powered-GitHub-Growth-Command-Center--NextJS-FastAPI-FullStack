@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Filter, Lightbulb, Tag, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Filter, Lightbulb, Tag, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { useRepos } from "@/hooks/use-repos";
 import { staggerDelay } from "@/lib/stagger";
 
 export function RecommendationsClient() {
-  const { data: recommendations } = useRecommendations();
+  const { data: recommendations, isError } = useRecommendations();
   const { data: repos } = useRepos();
   const dismiss = useDismissRecommendation();
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
@@ -57,7 +57,11 @@ export function RecommendationsClient() {
         </div>
       )}
 
-      {visible && visible.length === 0 ? (
+      {isError && !recommendations ? (
+        // Gated on !recommendations (not bare isError) so a background-refetch
+        // failure doesn't discard already-visible data for an error block.
+        <EmptyState icon={AlertTriangle} title="Couldn't load recommendations" description="Please try refreshing the page." />
+      ) : visible && visible.length === 0 ? (
         <EmptyState icon={CheckCircle2} title="Inbox zero" description="No open recommendations right now." />
       ) : (
         <div className="space-y-2">

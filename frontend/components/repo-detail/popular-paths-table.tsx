@@ -1,6 +1,6 @@
 "use client";
 
-import { Route } from "lucide-react";
+import { AlertTriangle, Route } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -16,13 +16,17 @@ const columns: ColumnDef<PopularPath>[] = [
 ];
 
 export function PopularPathsTable({ repoId }: { repoId: number }) {
-  const { data: paths, isPending } = useRepoPopularPaths(repoId);
+  const { data: paths, isPending, isError } = useRepoPopularPaths(repoId);
 
   return (
     <div className="space-y-3">
       <SectionHeading icon={Route} title="Popular content" subtitle="Most-viewed paths in this repo" iconColor="text-sky-500" />
       {isPending ? (
         <Skeleton className="h-32 w-full" />
+      ) : isError && !paths ? (
+        // Gated on !paths (not bare isError) so a background-refetch
+        // failure doesn't discard already-visible data for an error block.
+        <EmptyState icon={AlertTriangle} title="Couldn't load path data" description="Please try refreshing the page." />
       ) : paths && paths.length === 0 ? (
         <EmptyState icon={Route} title="No path data yet" description="GitHub's traffic API is a rolling 14-day window." />
       ) : (

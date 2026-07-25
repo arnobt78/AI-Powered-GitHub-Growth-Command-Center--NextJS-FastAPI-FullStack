@@ -14,6 +14,19 @@ export function NotificationSettingsCard() {
   const updateMe = useUpdateMe();
   const [value, setValue] = useState(me?.notification_email ?? "");
 
+  // Re-sync local input whenever the server value changes (e.g. the
+  // `user_updated` SSE event refetching this from another tab) — without
+  // this, useState's initializer only runs once, so a newer server value
+  // would be silently overwritten by the stale local value on the next Save.
+  // Adjusting state during render (React's documented pattern for this,
+  // guarded by comparing against the last-seen server value) rather than in
+  // a useEffect avoids an extra post-commit render pass.
+  const [lastSyncedEmail, setLastSyncedEmail] = useState(me?.notification_email);
+  if (me?.notification_email !== lastSyncedEmail) {
+    setLastSyncedEmail(me?.notification_email);
+    setValue(me?.notification_email ?? "");
+  }
+
   const effectiveEmail = me?.notification_email || me?.email || "No email on file";
 
   const handleSave = () => {

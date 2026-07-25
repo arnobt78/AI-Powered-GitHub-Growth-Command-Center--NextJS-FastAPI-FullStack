@@ -76,6 +76,8 @@ Every open browser tab also subscribes to the backend's `/events` SSE stream (`h
 
 The browser never holds the backend's API key: Next.js Route Handlers under `frontend/app/api/**` proxy every backend call server-side, using the same typed `lib/api.ts` client the Server Components use for SSR.
 
+Every data-fetching component also handles the failure path, not just loading/empty/success: a failed query (gated on `isError && !data`, so a background-refetch failure never discards data already on screen) shows an inline error state instead of silently rendering blank, and root-level `error.tsx`/`global-error.tsx`/`not-found.tsx` catch anything that slips past a page's own Server Component prefetch.
+
 ## Draft-and-approve automation (Phase 4, in progress)
 
 Everything beyond analytics (README suggestions, release notes, social posts, issue replies — see `PROJECT_PLAN.md` Phase 4) writes a `Draft` row instead of acting directly. Nothing external — no post, no reply, no PR — happens until a human approves it via the Drafts inbox. Phase 4A shipped the plumbing (the `Draft` model, API, and inbox UI); Phase 4B is the first real producer.

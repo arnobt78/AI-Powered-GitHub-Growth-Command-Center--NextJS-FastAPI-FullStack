@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLink, Eye, GitFork, Lightbulb, Star } from "lucide-react";
+import { AlertTriangle, ExternalLink, Eye, GitFork, Lightbulb, Star } from "lucide-react";
 import { Line, LineChart, ResponsiveContainer } from "recharts";
 import Link from "next/link";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -15,7 +15,7 @@ import { semanticColor } from "@/lib/semantic-color";
 import type { Repo } from "@/lib/api-types";
 
 export function RepoCard({ repo }: { repo: Repo }) {
-  const { data: snapshots, isPending } = useRepoSnapshots(repo.id);
+  const { data: snapshots, isPending, isError } = useRepoSnapshots(repo.id);
   const { data: insights } = useRepoInsights(repo.id);
 
   const latest = snapshots?.at(-1);
@@ -41,6 +41,16 @@ export function RepoCard({ repo }: { repo: Repo }) {
       <CardContent className="space-y-3">
         {isPending ? (
           <Skeleton className="h-16 w-full" />
+        ) : isError && !snapshots ? (
+          // Gated on !snapshots (not bare isError) so a background-refetch
+          // failure doesn't discard already-visible data. Compact inline
+          // fallback (not the full EmptyState) — this card sits in a dense
+          // grid, so a bordered/padded empty-state block would break the
+          // grid's compact layout.
+          <div className="flex h-16 items-center justify-center gap-1.5 text-xs text-muted-foreground">
+            <AlertTriangle className="h-3.5 w-3.5 text-red-500" aria-hidden="true" />
+            Couldn&apos;t load trend data
+          </div>
         ) : (
           <div className="h-16">
             <ResponsiveContainer width="100%" height="100%">

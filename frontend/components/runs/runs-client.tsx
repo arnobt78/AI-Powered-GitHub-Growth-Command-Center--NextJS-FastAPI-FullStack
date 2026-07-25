@@ -1,6 +1,6 @@
 "use client";
 
-import { History, Play } from "lucide-react";
+import { AlertTriangle, History, Play } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -9,7 +9,7 @@ import { useRuns, useTriggerRun } from "@/hooks/use-runs";
 import { RunRow } from "@/components/runs/run-row";
 
 export function RunsClient() {
-  const { data: runs } = useRuns();
+  const { data: runs, isError } = useRuns();
   const triggerRun = useTriggerRun();
 
   return (
@@ -29,7 +29,11 @@ export function RunsClient() {
           {triggerRun.isPending ? "Running..." : "Run now"}
         </Button>
       </div>
-      {runs && runs.length === 0 ? (
+      {isError && !runs ? (
+        // Gated on !runs (not bare isError) so a background-refetch failure
+        // doesn't discard already-visible data for an error block.
+        <EmptyState icon={AlertTriangle} title="Couldn't load runs" description="Please try refreshing the page." />
+      ) : runs && runs.length === 0 ? (
         <EmptyState icon={History} title="No runs yet" description="Trigger one manually or wait for the daily schedule." />
       ) : (
         <div className="space-y-2">

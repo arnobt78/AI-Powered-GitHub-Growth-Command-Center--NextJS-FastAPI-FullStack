@@ -1,14 +1,24 @@
 "use client";
 
+import { AlertTriangle } from "lucide-react";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRepoSnapshots } from "@/hooks/use-repo-snapshots";
 
 export function TrendChart({ repoId }: { repoId: number }) {
-  const { data: snapshots, isPending } = useRepoSnapshots(repoId);
+  const { data: snapshots, isPending, isError } = useRepoSnapshots(repoId);
 
   if (isPending) {
     return <Skeleton className="h-64 w-full" />;
+  }
+
+  // isError alone would also fire on a background-refetch failure that
+  // leaves prior data intact (TanStack Query's isLoadingError vs
+  // isRefetchError distinction) — gating on !snapshots keeps already-visible
+  // data on screen instead of discarding it for an error block.
+  if (isError && !snapshots) {
+    return <EmptyState icon={AlertTriangle} title="Couldn't load trend data" description="Please try refreshing the page." />;
   }
 
   return (

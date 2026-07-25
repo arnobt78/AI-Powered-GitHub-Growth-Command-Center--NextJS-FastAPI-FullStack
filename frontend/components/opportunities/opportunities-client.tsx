@@ -1,6 +1,6 @@
 "use client";
 
-import { Radar, X } from "lucide-react";
+import { AlertTriangle, Radar, X } from "lucide-react";
 import { useMemo } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 
 export function OpportunitiesClient() {
-  const { data: opportunities } = useOpportunities();
+  const { data: opportunities, isError } = useOpportunities();
   const { data: repos } = useRepos();
   const dismiss = useDismissOpportunity();
 
@@ -34,7 +34,11 @@ export function OpportunitiesClient() {
     <div className="space-y-6">
       <SectionHeading icon={Radar} title="Opportunities" subtitle="New community mentions of your tracked repos" iconColor="text-rose-500" />
 
-      {visible && visible.length === 0 ? (
+      {isError && !opportunities ? (
+        // Gated on !opportunities (not bare isError) so a background-refetch
+        // failure doesn't discard already-visible data for an error block.
+        <EmptyState icon={AlertTriangle} title="Couldn't load opportunities" description="Please try refreshing the page." />
+      ) : visible && visible.length === 0 ? (
         <EmptyState icon={Radar} title="No opportunities yet" description="They'll show up here once a mention is found." />
       ) : (
         <div className="space-y-2">

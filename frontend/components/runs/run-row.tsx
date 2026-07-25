@@ -78,7 +78,7 @@ function StageRowLine({ stageRow }: { stageRow: StageRun }) {
 // `size` prop (components/ui/card.tsx).
 export function RunRow({ run, index = 0 }: { run: PipelineRun; index?: number }) {
   const [expanded, setExpanded] = useState(false);
-  const { data: stages, isPending } = useRunStages(run.id, expanded);
+  const { data: stages, isPending, isError } = useRunStages(run.id, expanded);
   const meta = STATUS_META[run.status as keyof typeof STATUS_META] ?? STATUS_META.running;
   const StatusIcon = meta.icon;
   const kindKey = (run.pipeline_kind as keyof typeof KIND_META) in KIND_META ? (run.pipeline_kind as keyof typeof KIND_META) : "analytics";
@@ -117,6 +117,15 @@ export function RunRow({ run, index = 0 }: { run: PipelineRun; index?: number })
           <div className="mt-3 space-y-1 border-t pt-3">
             {isPending ? (
               <Skeleton className="h-20 w-full" />
+            ) : isError && !stages ? (
+              // Gated on !stages (not bare isError) so a background-refetch
+              // failure doesn't discard already-visible data. Compact inline
+              // fallback — this is a nested region within an already-compact
+              // card row, not a full page section.
+              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                <AlertTriangle className="h-3.5 w-3.5 text-red-500" aria-hidden="true" />
+                Couldn&apos;t load stage details
+              </div>
             ) : (
               STAGE_ORDER[kindKey].map((stageName, stageIndex) => {
                 const stageRow = stages?.find((s) => s.stage_name === stageName);

@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Inbox, Sparkles, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Inbox, Sparkles, X } from "lucide-react";
 import { useMemo } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,7 @@ const DRAFT_KIND_LABELS: Record<string, string> = {
 } satisfies Record<DraftKind, string>;
 
 export function DraftsClient() {
-  const { data: drafts } = useDrafts();
+  const { data: drafts, isError } = useDrafts();
   const { data: repos } = useRepos();
   const review = useReviewDraft();
   const triggerContentRun = useTriggerContentRun();
@@ -59,7 +59,11 @@ export function DraftsClient() {
         </Button>
       </div>
 
-      {pending && pending.length === 0 ? (
+      {isError && !drafts ? (
+        // Gated on !drafts (not bare isError) so a background-refetch
+        // failure doesn't discard already-visible data for an error block.
+        <EmptyState icon={AlertTriangle} title="Couldn't load drafts" description="Please try refreshing the page." />
+      ) : pending && pending.length === 0 ? (
         <EmptyState icon={Inbox} title="No drafts yet" description="Click 'Generate drafts' or wait for the daily schedule." />
       ) : (
         <div className="space-y-2">

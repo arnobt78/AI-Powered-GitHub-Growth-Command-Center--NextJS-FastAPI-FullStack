@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Lightbulb, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Lightbulb, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useDismissRecommendation, useRecommendations } from "@/hooks/use-recommendations";
 
 export function RepoRecommendations({ repoId }: { repoId: number }) {
-  const { data: recommendations, isPending } = useRecommendations();
+  const { data: recommendations, isPending, isError } = useRecommendations();
   const dismiss = useDismissRecommendation();
 
   const scoped = recommendations?.filter((r) => r.repo_id === repoId && !r.dismissed);
@@ -20,6 +20,10 @@ export function RepoRecommendations({ repoId }: { repoId: number }) {
       <SectionHeading icon={Lightbulb} title="Recommendations" subtitle="Fact-checked suggestions for this repo" iconColor="text-amber-500" />
       {isPending ? (
         <Skeleton className="h-24 w-full" />
+      ) : isError && !recommendations ? (
+        // Gated on !recommendations (not bare isError) so a background-refetch
+        // failure doesn't discard already-visible data for an error block.
+        <EmptyState icon={AlertTriangle} title="Couldn't load recommendations" description="Please try refreshing the page." />
       ) : scoped && scoped.length === 0 ? (
         <EmptyState icon={CheckCircle2} title="All caught up" description="No open recommendations for this repo." />
       ) : (

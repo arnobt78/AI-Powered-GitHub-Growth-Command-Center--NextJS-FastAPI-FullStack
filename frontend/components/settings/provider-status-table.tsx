@@ -1,6 +1,6 @@
 "use client";
 
-import { Cpu } from "lucide-react";
+import { AlertTriangle, Cpu } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -34,13 +34,17 @@ const columns: ColumnDef<ProviderStatus>[] = [
 ];
 
 export function ProviderStatusTable() {
-  const { data: statuses, isPending } = useProviderStatus();
+  const { data: statuses, isPending, isError } = useProviderStatus();
 
   return (
     <div className="space-y-3">
       <SectionHeading icon={Cpu} title="LLM provider usage" subtitle="Calls made today, per free-tier provider" iconColor="text-sky-500" />
       {isPending ? (
         <Skeleton className="h-24 w-full" />
+      ) : isError && !statuses ? (
+        // Gated on !statuses (not bare isError) so a background-refetch
+        // failure doesn't discard already-visible data for an error block.
+        <EmptyState icon={AlertTriangle} title="Couldn't load provider usage" description="Please try refreshing the page." />
       ) : statuses && statuses.length === 0 ? (
         <EmptyState icon={Cpu} title="No usage yet today" description="Provider usage resets daily." />
       ) : (

@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Clapperboard, Loader2, Play, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clapperboard, Loader2, Play, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,7 +16,7 @@ const STATUS_META = {
 } as const;
 
 export function DemoAssetsSection({ repoId }: { repoId: number }) {
-  const { data: assets, isPending } = useDemoAssets(repoId);
+  const { data: assets, isPending, isError } = useDemoAssets(repoId);
   const trigger = useTriggerDemoAsset(repoId);
 
   return (
@@ -36,6 +36,10 @@ export function DemoAssetsSection({ repoId }: { repoId: number }) {
 
       {isPending ? (
         <Skeleton className="h-24 w-full" />
+      ) : isError && !assets ? (
+        // Gated on !assets (not bare isError) so a background-refetch
+        // failure doesn't discard already-visible data for an error block.
+        <EmptyState icon={AlertTriangle} title="Couldn't load demo assets" description="Please try refreshing the page." />
       ) : assets && assets.length === 0 ? (
         <EmptyState icon={Clapperboard} title="No demo videos yet" description="Click Generate to record a walkthrough." />
       ) : (

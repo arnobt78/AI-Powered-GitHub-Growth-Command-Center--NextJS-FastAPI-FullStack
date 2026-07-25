@@ -67,7 +67,12 @@ def review_draft(
 
 
 def _post_reply(draft: Draft, current_user: User, db: Session) -> None:
-    repo = db.get(Repo, draft.repo_id)
+    # Scoped by user_id even though draft.repo_id already came from a
+    # user-owned Draft row — defense in depth so this lookup can never
+    # silently cross a tenant boundary if this helper is ever reused elsewhere.
+    repo = db.execute(
+        select(Repo).where(Repo.id == draft.repo_id, Repo.user_id == current_user.id)
+    ).scalar_one()
     try:
         gh_client = GitHubClient(token=decrypt_token(current_user.access_token_encrypted))
         if draft.kind == "issue_reply":

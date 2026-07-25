@@ -1,6 +1,6 @@
 "use client";
 
-import { Trophy } from "lucide-react";
+import { AlertTriangle, Trophy } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -17,13 +17,17 @@ const columns: ColumnDef<Benchmark>[] = [
 ];
 
 export function BenchmarkTable({ repoId }: { repoId: number }) {
-  const { data: benchmarks, isPending } = useRepoBenchmarks(repoId);
+  const { data: benchmarks, isPending, isError } = useRepoBenchmarks(repoId);
 
   return (
     <div className="space-y-3">
       <SectionHeading icon={Trophy} title="Benchmark repos" subtitle="Similar public repos, for comparison" iconColor="text-amber-500" />
       {isPending ? (
         <Skeleton className="h-32 w-full" />
+      ) : isError && !benchmarks ? (
+        // Gated on !benchmarks (not bare isError) so a background-refetch
+        // failure doesn't discard already-visible data for an error block.
+        <EmptyState icon={AlertTriangle} title="Couldn't load benchmarks" description="Please try refreshing the page." />
       ) : benchmarks && benchmarks.length === 0 ? (
         <EmptyState icon={Trophy} title="No benchmarks yet" description="These populate on the next pipeline run." />
       ) : (

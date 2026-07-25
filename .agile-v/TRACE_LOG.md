@@ -21,3 +21,5 @@ Format: `TIMESTAMP | SPAN_TYPE | AGENT/SKILL | POLICY_REFS | OUTCOME`
 2026-07-20 | remediation | user action | POL-0004 | User deleted the GitHub repository and ran `rm -rf .git` locally, independently of the controller's in-progress filter-repo remediation.
 
 2026-07-20 | remediation | controller | POL-0004 | Verified old repo deletion via GitHub API; re-initialized git, staged and reviewed full index (`git status --short`) before committing, created one clean commit, created new repository, pushed. Verified `git log --all` returns empty for the 3 sensitive filenames. CAPA-0003 marked verified-effective.
+
+2026-07-26 | audit | 2 fresh subagents (backend, frontend) + 1 fresh reviewer | POL-0001-0006 | Whole-codebase deep audit post-Phase-4G. Found and fixed 4 real gaps (RISK-0020): drafts.py user-scoping letter-violation, notification-settings-card stale-state bug, missing isError handling on 13 components, missing Next.js error boundaries. Independently re-reviewed; 2 further findings (isError data-gating, a wrong WHY-comment) fixed and re-verified. Backend 219/219, frontend tsc/eslint/vitest(88/88)/build all clean.
