@@ -2,6 +2,19 @@
 
 Living roadmap. Requirement-level detail and status: `.agile-v/REQUIREMENTS.md`. This file is the human-readable narrative version.
 
+## Status Summary (read this first)
+
+| Phase | Status |
+|---|---|
+| Phase 1: Repo Health & Analytics | ✅ Done — code-complete, reviewed, Gate 2-accepted |
+| Phase 2: Multi-Tenant SaaS Foundation | ✅ Done — code-complete, reviewed, Gate 2-accepted, live E2E OAuth-verified |
+| **Phase 3: Visual & Portfolio Polish** | ❌ **Not started** — no design, no code |
+| Phase 4A–4G: Professional Automation & Growth Platform | ✅ Done — all 7 sub-projects code-complete, reviewed, Gate 2-accepted (4C/4D shipped with a narrower scope than originally sketched; see their rows below) |
+| Deployment (VPS + Vercel) | ❌ Not started — requires Product Owner action (server/dashboard access this agent doesn't have) |
+| 4C/4D cross-posting, Reddit monitoring, 4G cloud storage | ❌ Not started — each requires registering a developer account/API key first (see the "New external dependencies" table below) |
+
+"Everything done" earlier in this conversation was wrong — it described Phase 4 as if it were the whole plan and skipped Phase 3 entirely. Corrected here.
+
 ## Phase 1: Repo Health & Analytics
 
 The foundation everything else builds on — track repo metrics over time, benchmark against similar projects, surface AI-synthesized (and fact-checked) recommendations, in a fast personal dashboard.
@@ -64,11 +77,16 @@ Full design: `docs/superpowers/specs/2026-07-21-multi-tenant-saas-design.md`.
 
 **Status:** built via 18-task subagent-driven plan (`docs/superpowers/plans/2026-07-21-github-growth-bot-multi-tenant-saas.md`), each task independently reviewed, plus a whole-backend review (after the 10 backend tasks) and a final whole-branch review (after all 18). Real gaps found and fixed along the way: a `needs_reauth` circuit-breaker marker missing from the plan's own reference code (Task 8); a scheduler blast-radius bug where one tenant's corrupted OAuth token could have aborted the entire nightly run for every user (whole-backend review); and, at final review, two deploy-time hazards — undocumented shared-secret requirements between the frontend/backend `.env` files, and a silent sign-in failure mode if the backend's user-provisioning call ever 500s. All fixed and re-verified. Backend: 69/69 tests, `pip-audit` clean. Frontend: `tsc`/`eslint`/`build` clean, 8/8 tests. **Not yet done:** live end-to-end verification with a real GitHub OAuth App (needs the Product Owner to register one) — everything else is code-complete and reviewed.
 
-## Phase 3: Visual & Portfolio Polish (planned, after Phase 2)
+## Phase 3: Visual & Portfolio Polish — ❌ Not started
 
-Fonts, icon/color consistency pass, and an "agentic pipeline" visualization — showing the 7-stage pipeline actually running live (which stage is active, what it found) rather than just its end results, since that's the most portfolio-differentiating thing this project has and it's currently invisible to a viewer.
+Sequenced after Phase 2 in the original plan; Phase 4 was built first instead (Product Owner's own priority call), and Phase 3 was never picked back up. No design spec, no plan, no code.
 
-## Phase 4: Professional Automation & Growth Platform (in progress, after Phase 2)
+**Not yet done:**
+
+- Fonts + icon/color consistency pass across the whole frontend
+- "Agentic pipeline" visualization — showing the 7-stage analytics pipeline (and now the 7-stage content pipeline from Phase 4) actually running live (which stage is active, what it found) instead of only its end results; this is the most portfolio-differentiating thing this project has and it's currently invisible to a viewer
+
+## Phase 4: Professional Automation & Growth Platform — ✅ Done (2026-07-24, all 7 sub-projects)
 
 Turns the product from "tracks your repo's numbers" into "an agentic co-pilot that grows your repo for you" — the full feature set originally sketched in `docs/PROJECT_IDEA.md`, now scoped into concrete, independently buildable sub-projects. Every sub-project below still goes through its own `superpowers:brainstorming` → design spec → `superpowers:writing-plans` → `superpowers:subagent-driven-development` cycle before implementation starts — this section is the architecture that governs those specs, not a substitute for them.
 
