@@ -1,3 +1,14 @@
+/**
+ * Server-only FastAPI client used by Route Handlers and RSC `page.tsx` prefetches.
+ *
+ * Educational walkthrough
+ * -----------------------
+ * - Marked `server-only` so bundling into client components fails at build time
+ *   (the BACKEND_API_KEY must never ship to the browser).
+ * - Attaches Bearer API key + HMAC internal user token on every call.
+ * - Falls back to recording identity during Phase 4G headless demo capture.
+ */
+
 import "server-only";
 import { auth } from "@/auth";
 import { mintInternalUserToken } from "@/lib/internal-auth";

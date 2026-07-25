@@ -1,3 +1,10 @@
+/**
+ * Repo detail page — charts, benchmarks, traffic, recommendations, demo assets.
+ *
+ * Educational walkthrough: supports `?recording_token=` for headless demo
+ * capture (Phase 4G). Prefetches related queries in parallel then dehydrates.
+ */
+
 import { QueryClient, dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { notFound } from "next/navigation";
 import { api } from "@/lib/api";

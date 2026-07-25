@@ -1,3 +1,5 @@
+"""Analytics stage 6 — hallucination/consistency checks before recommendations are trusted."""
+
 import re
 
 from app.pipeline.base import PipelineContext, Stage

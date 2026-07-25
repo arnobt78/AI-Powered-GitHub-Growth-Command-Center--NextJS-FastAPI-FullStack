@@ -1,3 +1,16 @@
+/**
+ * Stable TanStack Query key factory — single source of truth for cache identity.
+ *
+ * Educational walkthrough
+ * -----------------------
+ * Always import keys from here (never hard-code `["repos"]` in components).
+ * Mutations + SSE handlers invalidate these keys so the current page and every
+ * other open tab refresh immediately without a full page reload.
+ *
+ * Nested factories (e.g. `repos.snapshots(id)`) keep related data hierarchical
+ * so prefix invalidation of `repos.all` can refresh nested insight queries too.
+ */
+
 export const queryKeys = {
   repos: {
     all: ["repos"] as const,

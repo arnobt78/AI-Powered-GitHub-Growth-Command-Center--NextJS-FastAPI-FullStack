@@ -10,8 +10,8 @@ Please include:
 
 - A clear description of the issue
 - Steps to reproduce (or a minimal proof of concept)
-- Affected component (e.g. backend API, frontend auth, SSE proxy)
-- Impact assessment if you have one (e.g. data exposure, auth bypass)
+- Affected component (e.g. backend API, frontend auth, SSE proxy, recording token, draft approve → GitHub write)
+- Impact assessment if you have one (e.g. data exposure, auth bypass, cross-user access)
 
 **Do not** open a public GitHub issue or pull request for sensitive reports.
 
@@ -21,21 +21,22 @@ I aim to acknowledge valid reports within a few business days and will work with
 
 - Sharing production secrets, private OAuth tokens, or real user data beyond what is needed to demonstrate the issue
 - Destructive testing against systems you do not own
-- Social-engineering GitHub.com or third-party providers as part of a “report” against this repo
+- Social-engineering GitHub.com, Resend, or other third-party providers as part of a “report” against this repo
 
 ## Scope (high level)
 
 In scope examples:
 
-- Auth / session / API key handling flaws in this project’s code
+- Auth / session / API key / internal-token / recording-token handling flaws in this project’s code
 - Cross-user data leaks in multi-tenant endpoints
 - Injection, SSRF, or unsafe deserialization in this codebase
+- Unauthorized external actions (e.g. GitHub comment posting without a valid approved Draft path)
 - Secrets accidentally exposed by project configuration templates (not your private `.env`)
 
 Out of scope examples:
 
 - Denial of service via volumetric traffic alone
-- Issues solely in upstream GitHub, Vercel, or LLM provider platforms
+- Issues solely in upstream GitHub, Vercel, Resend, or LLM provider platforms
 - Missing security headers on a local `npm run dev` setup without a realistic exploit path
 
 ## Safe harbor

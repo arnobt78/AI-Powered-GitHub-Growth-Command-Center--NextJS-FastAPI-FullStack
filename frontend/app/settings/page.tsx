@@ -1,3 +1,7 @@
+/**
+ * Settings — manage repos, notification prefs, LLM provider status.
+ */
+
 import { QueryClient, dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
@@ -8,6 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPage() {
   const queryClient = new QueryClient();
 
+  // Three independent server fetches — parallelize for faster TTFB.
   const [repos, providerStatus, me] = await Promise.all([
     api.listRepos(),
     api.providerStatus(),

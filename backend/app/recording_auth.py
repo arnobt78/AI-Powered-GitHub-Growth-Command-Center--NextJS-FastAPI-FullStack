@@ -1,3 +1,5 @@
+"""Mint/verify short-lived recording tokens for Phase 4G headless dashboard capture."""
+
 import base64
 import hashlib
 import hmac

@@ -1,3 +1,5 @@
+"""Analytics stage 7 — persist snapshots, benchmarks, traffic, and validated recommendations."""
+
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session

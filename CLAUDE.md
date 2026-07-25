@@ -33,14 +33,11 @@ A multi-tenant GitHub account analytics/growth SaaS, growing into a draft-and-ap
 
 **Frontend (`frontend/` — Next.js App Router, TypeScript):**
 
-- Engineering standards for SSR, prefetch/hydrate, TanStack Query, SSE, UI, and agent reuse rules: [`docs/PROJECT_IDEA.md`](docs/PROJECT_IDEA.md).
-- SSR data-fetching goes directly in `page.tsx` (Server Components); only genuinely interactive code goes in `use client` components.
-- No `loading.tsx` files. Page shell (headers, labels, icons, buttons, card frames) renders instantly; only data-bearing regions show inline skeletons matching the real content's dimensions.
-- Independent server prefetches run in parallel (`Promise.all`), never sequential `await`s.
-- Every title/subtitle/label/button carries a `lucide-react` icon with semantic color tied to what it represents.
-- Shared structure: `lib/`, `hooks/`, `providers/`, `types/` (generated from the backend's OpenAPI schema — never hand-duplicate), `components/ui/`.
-- The browser never holds the backend's API key — Next.js Route Handlers proxy every backend call server-side.
-- CRUD mutations use TanStack Query + SSE-driven cache invalidation so every open tab updates instantly without a page refresh.
+- Engineering standards: [`docs/PROJECT_IDEA.md`](docs/PROJECT_IDEA.md). SEO metadata: [`frontend/lib/site-metadata.ts`](frontend/lib/site-metadata.ts) (`NEXT_PUBLIC_SITE_URL` after deploy).
+- SSR prefetch in `page.tsx`; `"use client"` only when needed; no `loading.tsx`; shell instant + data-slot skeletons.
+- Independent prefetches: `Promise.all`. Never `void` + `dehydrate`.
+- Icons: `lucide-react` + semantic color. Structure: `lib/`, `hooks/`, `providers/`, `types/` (OpenAPI), `components/ui/`.
+- Browser never holds backend API key — Route Handlers BFF. CRUD: TanStack Query + SSE invalidation (no full refresh).
 
 **Deployment:**
 

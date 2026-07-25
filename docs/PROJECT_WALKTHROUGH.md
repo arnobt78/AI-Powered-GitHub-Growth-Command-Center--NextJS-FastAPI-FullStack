@@ -1,6 +1,8 @@
-# Project Walkthrough — GitHub Growth Bot
+# Project Walkthrough — AI-Powered GitHub Growth Command Center
 
-How the system actually works, end to end. For status/roadmap see `PROJECT_PLAN.md`; for requirement-level traceability see `../.agile-v/REQUIREMENTS.md`; for the original design rationale see `superpowers/specs/2026-07-20-github-growth-bot-design.md`.
+How the system works end to end. Status/roadmap: `PROJECT_PLAN.md`. Traceability: `../.agile-v/REQUIREMENTS.md`. Design: `superpowers/specs/`. Engineering playbook: `PROJECT_IDEA.md`. Public README: `../README.md`.
+
+**Stack:** Next.js App Router (not Vite) + FastAPI + Postgres. Live UI via TanStack Query + SSE. SEO: `frontend/lib/site-metadata.ts` (`NEXT_PUBLIC_SITE_URL` after deploy; app remains `noindex`).
 
 ## The problem this solves
 

@@ -1,3 +1,23 @@
+"""SQLAlchemy ORM models — the Postgres schema as Python classes.
+
+Educational walkthrough
+-----------------------
+Every tenant-owned table carries ``user_id`` (FK → users) so queries can be
+scoped in SQL. Prefer ``ON DELETE CASCADE`` from parent → children so deleting
+a user/repo cleans related history without orphan rows.
+
+High-level map:
+- ``User`` — GitHub identity + encrypted OAuth token + notification prefs
+- ``Repo`` — tracked repositories
+- ``Snapshot`` / ``Referrer`` / ``PopularPath`` / ``BenchmarkRepo`` — time-series & peers
+- ``PipelineRun`` / ``StageRun`` — run history (``pipeline_kind`` distinguishes analytics/content/opportunities)
+- ``Recommendation`` — LLM growth suggestions (dismissable)
+- ``Draft`` — approve/reject before external side effects
+- ``Opportunity`` — HN/Discussions matches (dismissable, not draft-gated)
+- ``DemoAsset`` — generated walkthrough videos
+- ``LLMUsage`` — per-provider call accounting for Settings status
+"""
+
 from datetime import date, datetime, timezone
 
 from sqlalchemy import (
@@ -16,10 +36,13 @@ from app.db import Base
 
 
 def _now() -> datetime:
+    """UTC timestamp helper for column defaults."""
     return datetime.now(timezone.utc)
 
 
 class User(Base):
+    """Signed-in GitHub account; one row per ``github_id``."""
+
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -45,6 +68,8 @@ class User(Base):
 
 
 class Repo(Base):
+    """A GitHub repo the user asked us to track."""
+
     __tablename__ = "repos"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -62,6 +87,8 @@ class Repo(Base):
 
 
 class Snapshot(Base):
+    """One day's metric snapshot for a tracked repo (stars/forks/traffic, …)."""
+
     __tablename__ = "snapshots"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -116,6 +143,8 @@ class PopularPath(Base):
 
 
 class PipelineRun(Base):
+    """One execution of a pipeline (status: running → ok|degraded)."""
+
     __tablename__ = "pipeline_runs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -127,6 +156,8 @@ class PipelineRun(Base):
 
 
 class StageRun(Base):
+    """Per-stage outcome inside a ``PipelineRun`` (isolation + timing + error text)."""
+
     __tablename__ = "stage_runs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -139,6 +170,8 @@ class StageRun(Base):
 
 
 class Recommendation(Base):
+    """Growth suggestion produced by analytics synthesizer/validator."""
+
     __tablename__ = "recommendations"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -154,6 +187,8 @@ class Recommendation(Base):
 
 
 class Draft(Base):
+    """Human-gated proposal (content / release notes / issue reply, …)."""
+
     __tablename__ = "drafts"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

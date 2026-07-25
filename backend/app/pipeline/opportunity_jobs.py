@@ -1,3 +1,5 @@
+"""Wire opportunities stages; daily/on-demand community scan entrypoints."""
+
 from sqlalchemy.orm import Session
 
 from app.events import broadcaster

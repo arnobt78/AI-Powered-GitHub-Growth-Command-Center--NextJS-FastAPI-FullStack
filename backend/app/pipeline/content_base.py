@@ -1,3 +1,5 @@
+"""Content-pipeline context/stage contract (Draft-producing path; mirrors analytics Stage interface)."""
+
 from dataclasses import dataclass, field
 from typing import Any
 

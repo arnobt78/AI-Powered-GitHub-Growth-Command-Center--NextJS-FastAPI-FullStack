@@ -1,3 +1,13 @@
+"""CRUD for tracked GitHub repositories (``/repos``).
+
+Educational walkthrough
+-----------------------
+- Router-level ``require_api_key``; handlers also use ``require_user``.
+- Creating a repo publishes ``repo_added`` SSE so other tabs refresh instantly.
+- Deletes cascade related rows in Postgres; frontend also invalidates
+  recommendations/drafts/opportunities caches on ``repo_removed``.
+"""
+
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request

@@ -1,16 +1,16 @@
-# AI-Powered GitHub Growth Command Center - Next.js, FastAPI, PostgreSQL, Tailwind CSS Full-Stack Project
+# AI-Powered GitHub Growth Command Center — Next.js, TypeScript, FastAPI, PostgreSQL, Tailwind CSS, Multi-LLM Full-Stack Project (Insights, Benchmarks, Recommendations, Draft-and-Approve Automation, Opportunities Inbox, SSE Live Sync)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Next.js](https://img.shields.io/badge/Next.js-16.2-black)](https://nextjs.org/)
-[![React](https://img.shields.io/badge/React-19.2-blue)](https://react.dev/)
+[![Next.js](https://img.shields.io/badge/Next.js-16.2.12-black)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-19.2.8-blue)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](https://www.typescriptlang.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.139-009688)](https://fastapi.tiangolo.com/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.140-009688)](https://fastapi.tiangolo.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-316192)](https://www.postgresql.org/)
 [![Launch with Diploi](https://diploi.com/launch.svg)](https://diploi.com/launch/arnobt78/github-growth-bot)
 
-A personal / multi-tenant **GitHub growth command center**: track stars, forks, watchers, and traffic over time, benchmark against similar public repos, and get LLM-synthesized recommendations — with a hard rule against ever artificially inflating any GitHub metric.
+A personal / multi-tenant **GitHub growth command center**: track stars, forks, watchers, and traffic over time, benchmark against similar public repos, surface LLM-checked recommendations, generate human-approved drafts (content, release notes, issue replies), monitor community opportunities (HN + Discussions), send optional alert emails, and record dashboard demo videos — with a hard rule against ever artificially inflating any GitHub metric.
 
-This repository is **actively developed** (not a finished product). Backend pipelines, Next.js dashboard, Auth.js GitHub OAuth, draft-and-approve automation, and SSE live updates are in place; production Coolify/Vercel deployment is still open. Check [`.agile-v/STATE.md`](.agile-v/STATE.md) for the latest gate status.
+This repository is **actively developed**. Phases 1–2 and the full Phase 4 build sequence (4A–4G) are Gate-2 accepted; **production Coolify/Vercel deployment is still open**. See [`.agile-v/STATE.md`](.agile-v/STATE.md) for live status.
 
 ---
 
@@ -38,18 +38,23 @@ This repository is **actively developed** (not a finished product). Backend pipe
 
 ## Features
 
-| Area                     | What you get                                                                                                               |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| **Repo tracking**        | Add/remove GitHub repos you own or care about; data is scoped per signed-in user.                                          |
-| **Snapshots & insights** | Historical stars / forks / watchers and derived insight summaries (paths avoid ad-blocker keywords — see API section).     |
-| **Benchmarks**           | Compare your repo against similar public repos.                                                                            |
-| **Traffic**              | Referrers and popular paths from GitHub traffic APIs (when the token has access).                                          |
-| **Recommendations**      | LLM-written, validator-checked growth suggestions; dismiss/update from the UI.                                             |
-| **Pipeline runs**        | Trigger analytics runs on demand; view stage history. Daily scheduler also kicks runs off.                                 |
-| **Drafts (automation)**  | Content/automation ideas land as **drafts** — humans approve or reject before anything external happens.                   |
-| **Live UI**              | Server-Sent Events (SSE) invalidate TanStack Query caches so open tabs update without a full page refresh.                 |
-| **Multi-provider LLM**   | Groq → Gemini → OpenRouter → Hugging Face → Cloudflare → Vercel AI Gateway, with graceful degradation if keys are missing. |
-| **Auth**                 | GitHub OAuth via Auth.js (NextAuth v5); backend never trusts the browser with the service API key.                         |
+| Area                              | What you get                                                            |
+| --------------------------------- | ----------------------------------------------------------------------- |
+| **Repo tracking**                 | Add/remove repos scoped to your signed-in GitHub user.                  |
+| **Snapshots & insights**          | Historical stars/forks/watchers and derived insight summaries.          |
+| **Benchmarks**                    | Compare your repo against similar public repos.                         |
+| **Traffic**                       | Referrers and popular paths (when the OAuth token has access).          |
+| **Recommendations**               | LLM-written, validator-checked growth suggestions; dismiss from the UI. |
+| **Analytics runs**                | On-demand + daily scheduled 7-stage pipeline per repo.                  |
+| **Content drafts (4B)**           | Generate draft posts/topics for human approve/reject.                   |
+| **Release-notes drafts (4C)**     | Folded into the content pipeline when a new tag appears.                |
+| **Opportunities inbox (4D)**      | HN + GitHub Discussions matches — dismissable, **not** draft-gated.     |
+| **Notifications (4E)**            | Optional Resend emails for degraded runs / reauth needs.                |
+| **Issue/discussion replies (4F)** | Approved drafts can post a real GitHub comment (first external write).  |
+| **Demo assets (4G)**              | Headless Playwright + ffmpeg walkthrough videos of a repo dashboard.    |
+| **Live UI**                       | SSE invalidates TanStack Query so open tabs update without refresh.     |
+| **Multi-provider LLM**            | Groq → Gemini → OpenRouter → HF → Cloudflare → Vercel AI Gateway.       |
+| **Auth**                          | Auth.js GitHub OAuth; browser never holds the backend service API key.  |
 
 ---
 
@@ -60,34 +65,36 @@ This project will **never**:
 - Auto-star, auto-fork, or auto-follow
 - Otherwise programmatically inflate GitHub metrics
 
-That violates GitHub’s Acceptable Use Policies and is out of product scope. Suggestions stay organic (docs, discoverability, community).
+Suggestions stay organic (docs, discoverability, community). External actions that _do_ touch GitHub (e.g. posting a comment) only happen after **explicit human draft approval**.
 
 ---
 
 ## Architecture
 
 ```text
-GitHub API
+GitHub API  (+ HN for opportunities)
     │
     ▼
-Extractor → Preprocessor → Analyzer → Optimizer → Synthesizer → Validator → Assembler
+Pipeline stages (analytics | content | opportunities) — each stage isolated
                                                               │
                                               LLMRouter (multi-provider fallback)
                                                               │
                                                          Postgres
                                                               │
-                                              FastAPI (REST + SSE)
+                         FastAPI (REST + SSE + optional Resend + demo video files)
                                                               │
                          Next.js Route Handlers (BFF)  ←── API_KEY + internal user token
                                                               │
                                                     Browser (no backend API key)
 ```
 
-**Analytics pipeline** (per tracked repo): seven isolated stages. One stage failing does not wipe earlier work.
+**Analytics pipeline:** `extractor` → `preprocessor` → `analyzer` → `optimizer` → `synthesizer` → `validator` → `assembler`
 
-**Content pipeline** (when enabled): parallel seven-stage path that writes `Draft` rows (`pipeline_kind="content"`) for human approval.
+**Content pipeline:** parallel seven-stage path that writes `Draft` rows (`pipeline_kind="content"`) for approve/reject. Release-notes and issue-reply draft kinds reuse this path.
 
-**Frontend BFF:** the browser calls `/api/...` on Next.js. Route Handlers call FastAPI with `Authorization: Bearer <API_KEY>` and an HMAC-signed per-user token. Secrets stay on the server.
+**Opportunities pipeline:** separate `pipeline_kind`; writes dismissable `Opportunity` rows (no approval gate).
+
+**Demo assets:** background job records the frontend with a short-lived **recording token** (headless browser has no user session), composites mp4 with ffmpeg, serves via authenticated API.
 
 ```mermaid
 flowchart LR
@@ -97,6 +104,7 @@ flowchart LR
   FastAPI --> GitHubAPI[GitHub_API]
   FastAPI --> LLMRouter
   FastAPI -->|SSE| NextBFF
+  FastAPI -->|optional| Resend
 ```
 
 ---
@@ -107,35 +115,35 @@ flowchart LR
 
 | Piece                     | Role (beginner view)                                                          |
 | ------------------------- | ----------------------------------------------------------------------------- |
-| **Python 3.12 + FastAPI** | Fast HTTP API framework; auto OpenAPI docs at `/docs` when the server runs.   |
-| **SQLAlchemy + Alembic**  | ORM for models; Alembic applies database migrations (`alembic upgrade head`). |
-| **PostgreSQL**            | Primary datastore for users, repos, snapshots, runs, recommendations, drafts. |
-| **httpx**                 | Async/sync HTTP client for GitHub and LLM providers.                          |
-| **APScheduler**           | In-process scheduler for daily analytics (+ offset content) runs.             |
-| **sse-starlette**         | Streams Server-Sent Events to the frontend.                                   |
+| **Python 3.12 + FastAPI** | HTTP API; interactive OpenAPI at `/docs`.                                     |
+| **SQLAlchemy + Alembic**  | ORM + database migrations (`alembic upgrade head`).                           |
+| **PostgreSQL**            | Source of truth for users, repos, runs, drafts, opportunities, demo assets, … |
+| **httpx**                 | Calls GitHub, HN, and LLM providers.                                          |
+| **APScheduler**           | Daily analytics / content / opportunities jobs (and demo retention cleanup).  |
+| **sse-starlette**         | Server-Sent Events to the frontend.                                           |
 | **cryptography (Fernet)** | Encrypts GitHub OAuth tokens at rest.                                         |
-| **slowapi**               | Rate limits sensitive POSTs (e.g. add repo, trigger runs).                    |
+| **slowapi**               | Rate limits sensitive POSTs.                                                  |
+| **Playwright + ffmpeg**   | Phase 4G headless recording + video encode (system packages on deploy host).  |
 
 ### Frontend
 
 | Piece                                 | Role (beginner view)                                      |
 | ------------------------------------- | --------------------------------------------------------- |
-| **Next.js 16 App Router**             | React framework; Server Components + Route Handlers.      |
+| **Next.js 16 App Router**             | RSC pages + Route Handlers (BFF).                         |
 | **React 19 + TypeScript**             | UI + static typing.                                       |
-| **Auth.js (next-auth v5)**            | GitHub OAuth sign-in and session cookies.                 |
-| **TanStack Query**                    | Client cache for API data; mutations + invalidation.      |
+| **Auth.js (next-auth v5)**            | GitHub OAuth + session cookies.                           |
+| **TanStack Query**                    | Client cache; mutations + SSE-driven invalidation.        |
+| **TanStack Table**                    | Rich tables where used.                                   |
 | **Tailwind CSS 4 + shadcn / Base UI** | Styling and accessible primitives.                        |
-| **lucide-react**                      | Icons on titles/actions.                                  |
+| **lucide-react + Geist**              | Icons and typography.                                     |
 | **Recharts**                          | Trend charts / sparklines.                                |
-| **Sonner**                            | Toast notifications.                                      |
+| **Sonner**                            | Toasts.                                                   |
 | **openapi-typescript**                | Generates `frontend/types/api.d.ts` from backend OpenAPI. |
 
-### Deployment targets (planned)
+### Deployment targets (planned, not assumed live)
 
 - Backend → Coolify on a VPS + managed Postgres
 - Frontend → Vercel
-
-Production deploy is **not** assumed live in this README.
 
 ---
 
@@ -145,31 +153,33 @@ Production deploy is **not** assumed live in this README.
 github-bot/
 ├── backend/
 │   ├── app/
-│   │   ├── main.py              # FastAPI entry, health, lifespan/scheduler
-│   │   ├── api/                 # Routers: repos, insights, runs, drafts, …
-│   │   ├── pipeline/            # Stage runners (analytics + content)
-│   │   ├── models.py            # SQLAlchemy tables
-│   │   ├── llm_router.py        # Multi-provider LLM fallback
-│   │   └── deps.py              # Auth dependencies
-│   ├── alembic/                 # Migrations
-│   ├── tests/                   # pytest
+│   │   ├── main.py                 # FastAPI entry, health, scheduler lifespan
+│   │   ├── api/                    # repos, insights, runs, drafts, opportunities, …
+│   │   ├── pipeline/               # analytics + content + opportunities stages
+│   │   ├── models.py               # SQLAlchemy tables
+│   │   ├── llm_router.py           # Multi-provider LLM fallback
+│   │   ├── demo_asset_jobs.py      # 4G recording pipeline
+│   │   ├── recording_auth.py       # Mint/verify recording tokens
+│   │   └── deps.py                 # API key + per-user scoping
+│   ├── alembic/                    # Migrations
+│   ├── tests/                      # pytest (200+ tests)
 │   ├── .env.example
 │   ├── Dockerfile
 │   └── requirements.txt
 ├── frontend/
-│   ├── app/                     # Pages + Route Handlers (App Router)
-│   ├── components/              # Feature UI + components/ui
-│   ├── hooks/                   # TanStack Query hooks + SSE
-│   ├── providers/               # Query, theme, live events
-│   ├── lib/                     # API client, query keys, auth helpers
-│   ├── types/                   # OpenAPI-generated types
-│   ├── auth.ts                  # Auth.js config
+│   ├── app/                        # Pages + Route Handlers
+│   ├── components/                 # Feature UI + components/ui
+│   ├── hooks/                      # TanStack Query + SSE
+│   ├── providers/                  # Query, theme, live events
+│   ├── lib/                        # API client, query keys, auth helpers
+│   ├── types/                      # OpenAPI-generated types
+│   ├── auth.ts / proxy.ts          # Auth.js + gate (incl. recording token)
 │   ├── .env.local.example
 │   └── package.json
-├── docs/                        # Plans, walkthrough, engineering playbook
-├── .agile-v/                    # Requirements, gates, decisions
-├── CLAUDE.md                    # Agent instructions
-├── SECURITY.md                  # Vulnerability reporting
+├── docs/                           # Plans, walkthrough, engineering playbook
+├── .agile-v/                       # Requirements, gates, decisions
+├── CLAUDE.md
+├── SECURITY.md
 ├── LICENSE
 └── README.md
 ```
@@ -180,36 +190,47 @@ github-bot/
 
 ### 1. Sign-in
 
-1. User visits `/sign-in` and authenticates with GitHub (OAuth App).
-2. Auth.js stores a session on the frontend.
-3. On first login, the frontend provisions the user via `POST /users/upsert` (API key only).
-4. Later API calls include an **internal user token** so the backend scopes data to that `User`.
+1. User opens `/sign-in` and authenticates with GitHub (OAuth App).
+2. Auth.js keeps a session cookie on the frontend.
+3. First login provisions the user via `POST /users/upsert` (API key only).
+4. Later calls include an **HMAC-signed internal user token** so the backend scopes every query by `user_id`.
 
-### 2. Track repos and run the pipeline
+### 2. Track repos and run analytics
 
-1. User adds a repo in Settings / Overview.
-2. `POST /runs` starts the analytics pipeline (or the daily scheduler does).
-3. Stages run in order; each stage is isolated — failures are recorded per `stage_run`.
-4. Snapshots, benchmarks, traffic rows, and recommendations land in Postgres.
-5. SSE event `run_completed` (and related events) tell open browsers to invalidate React Query keys.
+1. Add a repo in Settings / Overview.
+2. `POST /runs` (or the daily scheduler) starts the analytics pipeline.
+3. Stages run in isolation; results land in Postgres.
+4. SSE `run_completed` (and related events) invalidate React Query keys in open tabs.
 
-### 3. Drafts (approve before acting)
+### 3. Drafts — approve before acting
 
-Anything that would eventually post or act externally is stored as a **Draft**. Humans `PATCH` to `approved` or `rejected`. No silent external side effects.
+Content, release notes, and issue/discussion replies become **Draft** rows. Humans `PATCH` to `approved` or `rejected`. Only then may the backend perform an external write (e.g. `create_issue_comment`).
 
-### 4. Instant UI updates
+### 4. Opportunities (no approval gate)
+
+HN + Discussions matches appear in `/opportunities`. Dismiss like a recommendation — nothing is posted for you automatically.
+
+### 5. Notifications (optional)
+
+If `RESEND_API_KEY` + `EMAIL_FROM` are set, alert emails can fire for degraded runs / reauth. Unset → silent no-op (no crash).
+
+### 6. Demo videos
+
+`POST /repos/{id}/demo-assets` starts a background recording. The backend mints a short-lived **recording token** so headless Chromium can open the repo page without a real login. Requires matching `RECORDING_AUTH_SECRET`, `FRONTEND_BASE_URL`, Playwright Chromium, and ffmpeg on the machine that runs the backend.
+
+### 7. Instant UI updates
 
 ```text
 Mutation or pipeline event
-        → backend publishes SSE
-        → frontend useLiveEvents invalidates query keys
-        → lists / detail / badges refetch
-        → no full page reload
+  → backend publishes SSE
+  → useLiveEvents invalidates query keys
+  → lists / detail / badges refetch
+  → no full page reload
 ```
 
-Engineering standards for SSR, prefetch, and cache sync live in [`docs/PROJECT_IDEA.md`](docs/PROJECT_IDEA.md).
+Engineering standards: [`docs/PROJECT_IDEA.md`](docs/PROJECT_IDEA.md).
 
-### Pipeline stage sketch (backend)
+### Pipeline stage sketch
 
 ```python
 class Stage:
@@ -218,38 +239,37 @@ class Stage:
         ...
 ```
 
-Analytics order: `extractor` → `preprocessor` → `analyzer` → `optimizer` → `synthesizer` → `validator` → `assembler`.
-
 ---
 
 ## Frontend routes and UI
 
-| Route              | Purpose                                                               |
-| ------------------ | --------------------------------------------------------------------- |
-| `/`                | Overview: tracked repos, deltas, sparklines                           |
-| `/repos/[id]`      | Detail: trends, benchmarks, referrers, popular paths, recommendations |
-| `/recommendations` | Inbox of growth suggestions                                           |
-| `/drafts`          | Draft-and-approve inbox                                               |
-| `/runs`            | Pipeline run history + trigger runs                                   |
-| `/settings`        | Manage repos + LLM provider status                                    |
-| `/sign-in`         | GitHub OAuth                                                          |
+| Route              | Purpose                                                           |
+| ------------------ | ----------------------------------------------------------------- |
+| `/`                | Overview: tracked repos, deltas, sparklines                       |
+| `/repos/[id]`      | Detail: trends, benchmarks, traffic, recommendations, demo assets |
+| `/recommendations` | Growth-suggestion inbox                                           |
+| `/opportunities`   | HN / Discussions opportunity inbox                                |
+| `/drafts`          | Draft-and-approve inbox (content, release notes, replies, …)      |
+| `/runs`            | Pipeline history + trigger analytics / content / opportunities    |
+| `/settings`        | Repos, notification prefs, LLM provider status                    |
+| `/sign-in`         | GitHub OAuth                                                      |
 
 **Reuse inside this app**
 
-- Pages are thin Server Components that prefetch + `HydrationBoundary`.
-- Interactive pieces live under `components/<feature>/` as `"use client"` only when needed.
-- Data access: `hooks/use-*.ts` + `lib/query-keys.ts` + `lib/api.ts`.
-- UI primitives: `components/ui/` (button, card, table, skeleton, …).
+- Thin Server Component `page.tsx` files prefetch + `HydrationBoundary`.
+- `"use client"` only for interaction (forms, charts, live tables).
+- Data: `hooks/use-*.ts` + `lib/query-keys.ts` + `lib/api.ts`.
+- Primitives: `components/ui/`.
 - Live sync: `providers/live-events-provider.tsx` → `hooks/use-live-events.ts`.
 
-**Pattern for a new list page**
+**Adding a new list feature**
 
-1. Add backend endpoint + OpenAPI type.
-2. Extend `queryKeys` and `lib/api`.
-3. Add a Route Handler under `app/api/...`.
-4. Prefetch in `page.tsx` with `Promise.all` when multiple queries.
-5. Build a client component that skeletons **data slots only** (keep titles visible).
-6. On mutation, invalidate every related key; map any new SSE event in `use-live-events`.
+1. Backend endpoint + Pydantic `response_model`
+2. OpenAPI types (`npm run generate:types`)
+3. Extend `queryKeys` + `lib/api` + Route Handler
+4. Prefetch with `await Promise.all` when independent
+5. Skeleton **data slots only**; keep titles visible
+6. Invalidate related keys on mutation; map new SSE events
 
 ---
 
@@ -260,39 +280,45 @@ Base URL (local): `http://localhost:8000`
 **Auth**
 
 - Almost every route: `Authorization: Bearer <API_KEY>`
-- User-scoped routes also need the internal user token header (minted by the frontend BFF).
-- Exception: `GET /api/health` (no API key).
-- Exception: `POST /users/upsert` (API key only — used at sign-in provisioning).
+- User-scoped routes also need the internal user token (minted by the Next.js BFF)
+- `GET /api/health` — no API key
+- `POST /users/upsert` — API key only (sign-in provisioning)
 
-**Naming:** paths use `insights` / `snapshots` / `benchmarks` / `runs` — **not** words like `analytics` / `metrics` (ad-blocker filters).
+**Naming:** use `insights` / `snapshots` / `benchmarks` / `runs` — **not** `analytics` / `metrics` (ad-blocker filters).
 
-| Method   | Path                        | Notes                     |
-| -------- | --------------------------- | ------------------------- |
-| `GET`    | `/api/health`               | Liveness                  |
-| `GET`    | `/repos`                    | List tracked repos        |
-| `POST`   | `/repos`                    | Add repo (rate limited)   |
-| `GET`    | `/repos/{id}`               | Repo detail               |
-| `DELETE` | `/repos/{id}`               | Remove repo               |
-| `GET`    | `/repos/{id}/snapshots`     | Time series               |
-| `GET`    | `/repos/{id}/insights`      | Derived insights          |
-| `GET`    | `/repos/{id}/benchmarks`    | Peer comparison           |
-| `GET`    | `/repos/{id}/referrers`     | Traffic referrers         |
-| `GET`    | `/repos/{id}/popular-paths` | Popular content paths     |
-| `GET`    | `/recommendations`          | List recommendations      |
-| `PATCH`  | `/recommendations/{id}`     | Update / dismiss          |
-| `GET`    | `/drafts`                   | List drafts               |
-| `PATCH`  | `/drafts/{id}`              | `approved` \| `rejected`  |
-| `GET`    | `/runs`                     | List pipeline runs        |
-| `POST`   | `/runs`                     | Start analytics run (202) |
-| `POST`   | `/runs/content`             | Start content run (202)   |
-| `GET`    | `/runs/{id}/stages`         | Per-stage status          |
-| `GET`    | `/providers/status`         | LLM provider readiness    |
-| `POST`   | `/users/upsert`             | Provision user from OAuth |
-| `GET`    | `/events`                   | SSE stream                |
+| Method   | Path                        | Notes                               |
+| -------- | --------------------------- | ----------------------------------- |
+| `GET`    | `/api/health`               | Liveness                            |
+| `GET`    | `/repos`                    | List tracked repos                  |
+| `POST`   | `/repos`                    | Add repo (rate limited)             |
+| `GET`    | `/repos/{id}`               | Detail                              |
+| `DELETE` | `/repos/{id}`               | Remove                              |
+| `GET`    | `/repos/{id}/snapshots`     | Time series                         |
+| `GET`    | `/repos/{id}/insights`      | Derived insights                    |
+| `GET`    | `/repos/{id}/benchmarks`    | Peer comparison                     |
+| `GET`    | `/repos/{id}/referrers`     | Traffic referrers                   |
+| `GET`    | `/repos/{id}/popular-paths` | Popular paths                       |
+| `GET`    | `/repos/{id}/demo-assets`   | List demo videos                    |
+| `POST`   | `/repos/{id}/demo-assets`   | Trigger recording (202)             |
+| `GET`    | `/demo-assets/{id}/video`   | Stream mp4 (auth’d)                 |
+| `GET`    | `/recommendations`          | List                                |
+| `PATCH`  | `/recommendations/{id}`     | Update / dismiss                    |
+| `GET`    | `/opportunities`            | List                                |
+| `PATCH`  | `/opportunities/{id}`       | Dismiss / update                    |
+| `GET`    | `/drafts`                   | List drafts                         |
+| `PATCH`  | `/drafts/{id}`              | `approved` \| `rejected`            |
+| `GET`    | `/runs`                     | List runs                           |
+| `POST`   | `/runs`                     | Start analytics (202)               |
+| `POST`   | `/runs/content`             | Start content (202)                 |
+| `POST`   | `/runs/opportunities`       | Start opportunities (202)           |
+| `GET`    | `/runs/{id}/stages`         | Per-stage status                    |
+| `GET`    | `/providers/status`         | LLM provider readiness              |
+| `POST`   | `/users/upsert`             | Provision user                      |
+| `GET`    | `/users/me`                 | Current user (+ notification prefs) |
+| `PATCH`  | `/users/me`                 | Update prefs                        |
+| `GET`    | `/events`                   | SSE stream                          |
 
-Interactive docs (when server is up): `http://localhost:8000/docs`
-
-Example health check:
+Interactive docs: [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ```bash
 curl -s http://localhost:8000/api/health
@@ -302,60 +328,71 @@ curl -s http://localhost:8000/api/health
 
 ## Environment variables
 
-You **do need** env files for a real local run (database, API key, OAuth, encryption, HMAC).  
-**LLM provider keys are optional** — metrics/snapshots still work; AI recommendations degrade gracefully if every LLM key is empty.
-
-Copy examples, never commit real secrets:
+You **do need** env files for a full local product run (Postgres, API key, OAuth, Fernet, HMAC).  
+**LLM keys are optional** — metrics still work; AI features degrade gracefully.  
+**Resend / email vars are optional** — alerts simply never send.  
+**Demo recording** needs `RECORDING_AUTH_SECRET` + `FRONTEND_BASE_URL` (+ ffmpeg/Playwright on the host).
 
 ```bash
 cp backend/.env.example backend/.env
 cp frontend/.env.local.example frontend/.env.local
 ```
 
+Never commit real `.env` / `.env.local` files.
+
 ### Backend — `backend/.env`
 
-| Variable                                       | Required?                         | How to get / set                                                                                                                   |
-| ---------------------------------------------- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`                                 | **Yes**                           | Postgres URL, e.g. `postgresql+psycopg://user:password@localhost:5432/github_growth_bot`. Create DB: `createdb github_growth_bot`. |
-| `API_KEY`                                      | **Yes**                           | Shared service key. `openssl rand -base64 32`. **Must match** frontend `BACKEND_API_KEY`.                                          |
-| `TOKEN_ENCRYPTION_KEY`                         | **Yes** (for OAuth token storage) | Fernet key only: `.venv/bin/python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`             |
-| `INTERNAL_AUTH_SECRET`                         | **Yes**                           | HMAC secret. `openssl rand -base64 32`. **Must match** frontend `INTERNAL_AUTH_SECRET`.                                            |
-| `CORS_ORIGINS`                                 | **Yes** for browser/dev           | JSON array, e.g. `["http://localhost:3000"]`.                                                                                      |
-| `GROQ_API_KEY`                                 | Optional                          | [Groq console](https://console.groq.com/keys)                                                                                      |
-| `GEMINI_API_KEY`                               | Optional                          | [Google AI Studio](https://aistudio.google.com/app/apikey)                                                                         |
-| `OPENROUTER_API_KEY`                           | Optional                          | [OpenRouter](https://openrouter.ai/keys)                                                                                           |
-| `HUGGINGFACE_API_KEY`                          | Optional                          | [HF tokens](https://huggingface.co/settings/tokens)                                                                                |
-| `CLOUDFLARE_API_KEY` / `CLOUDFLARE_ACCOUNT_ID` | Optional                          | Cloudflare dashboard                                                                                                               |
-| `VERCEL_AI_GATEWAY_KEY`                        | Optional                          | Vercel AI Gateway docs                                                                                                             |
+| Variable                                                                                                                    | Required?                                | How to get / set                                                                                                     |
+| --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                                                                                              | **Yes**                                  | e.g. `postgresql+psycopg://user:password@localhost:5432/github_growth_bot`. Create DB: `createdb github_growth_bot`. |
+| `API_KEY`                                                                                                                   | **Yes**                                  | `openssl rand -base64 32`. **Must match** frontend `BACKEND_API_KEY`.                                                |
+| `TOKEN_ENCRYPTION_KEY`                                                                                                      | **Yes**                                  | Fernet key: `.venv/bin/python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`    |
+| `INTERNAL_AUTH_SECRET`                                                                                                      | **Yes**                                  | `openssl rand -base64 32`. **Must match** frontend.                                                                  |
+| `CORS_ORIGINS`                                                                                                              | **Yes** for browser                      | JSON array, e.g. `["http://localhost:3000"]`.                                                                        |
+| `GROQ_API_KEY` / `GEMINI_API_KEY` / `OPENROUTER_API_KEY` / `HUGGINGFACE_API_KEY` / `CLOUDFLARE_*` / `VERCEL_AI_GATEWAY_KEY` | Optional                                 | Provider consoles — see comments in `.env.example`.                                                                  |
+| `RESEND_API_KEY`                                                                                                            | Optional                                 | [Resend API keys](https://resend.com/api-keys)                                                                       |
+| `EMAIL_FROM`                                                                                                                | Optional                                 | Verified sender, e.g. `GitHub Growth <alerts@yourdomain.com>`                                                        |
+| `FRONTEND_BASE_URL`                                                                                                         | Needed for emails + demo recording links | e.g. `http://localhost:3000` (no trailing slash)                                                                     |
+| `DEMO_ASSETS_DIR`                                                                                                           | Optional                                 | Default `demo_assets`                                                                                                |
+| `DEMO_ASSET_RETENTION_DAYS`                                                                                                 | Optional                                 | Default `3`                                                                                                          |
+| `RECORDING_AUTH_SECRET`                                                                                                     | **Yes for 4G demos**                     | `openssl rand -base64 32`. **Must match** frontend.                                                                  |
 
-> Older single-user setups sometimes used a raw `GITHUB_TOKEN`. Multi-tenant mode stores per-user OAuth tokens (encrypted). Prefer GitHub OAuth via the frontend for full product behavior.
+System installs for demo recording (deploy/dev host, not env vars):
+
+```bash
+# Debian/Ubuntu example
+sudo apt-get install -y ffmpeg
+cd backend && .venv/bin/playwright install chromium --with-deps
+```
 
 ### Frontend — `frontend/.env.local`
 
-| Variable               | Required?           | How to get / set                                                                               |
-| ---------------------- | ------------------- | ---------------------------------------------------------------------------------------------- |
-| `BACKEND_URL`          | **Yes**             | `http://localhost:8000` locally.                                                               |
-| `BACKEND_API_KEY`      | **Yes**             | Same value as backend `API_KEY`.                                                               |
-| `AUTH_SECRET`          | **Yes**             | Auth.js cookie encryption. `openssl rand -base64 32` (frontend-only).                          |
-| `AUTH_GITHUB_ID`       | **Yes** for sign-in | GitHub → Settings → Developer settings → [OAuth Apps](https://github.com/settings/developers). |
-| `AUTH_GITHUB_SECRET`   | **Yes** for sign-in | Generated once on the OAuth App page — copy immediately.                                       |
-| `INTERNAL_AUTH_SECRET` | **Yes**             | Same value as backend `INTERNAL_AUTH_SECRET`.                                                  |
+| Variable                | Required?           | How to get / set                                                        |
+| ----------------------- | ------------------- | ----------------------------------------------------------------------- |
+| `BACKEND_URL`           | **Yes**             | `http://localhost:8000`                                                 |
+| `BACKEND_API_KEY`       | **Yes**             | Same as backend `API_KEY`                                               |
+| `AUTH_SECRET`           | **Yes**             | Auth.js cookie secret: `openssl rand -base64 32` (frontend-only)        |
+| `AUTH_GITHUB_ID`        | **Yes** for sign-in | [GitHub OAuth Apps](https://github.com/settings/developers) → Client ID |
+| `AUTH_GITHUB_SECRET`    | **Yes** for sign-in | Generate client secret once — copy immediately                          |
+| `INTERNAL_AUTH_SECRET`  | **Yes**             | Same as backend                                                         |
+| `RECORDING_AUTH_SECRET` | **Yes for 4G**      | Same as backend                                                         |
 
-**GitHub OAuth App settings (local)**
+**GitHub OAuth App (local)**
 
 - Homepage URL: `http://localhost:3000`
-- Authorization callback URL: `http://localhost:3000/api/auth/callback/github`
+- Callback URL: `http://localhost:3000/api/auth/callback/github`
 
-GitHub allows **one callback URL per OAuth App** — use a separate OAuth App for production.
+One callback URL per OAuth App — use a **separate** app for production.
 
 Shared secret checklist:
 
 ```text
-backend API_KEY          ==  frontend BACKEND_API_KEY
-backend INTERNAL_AUTH_SECRET  ==  frontend INTERNAL_AUTH_SECRET
+backend API_KEY                 ==  frontend BACKEND_API_KEY
+backend INTERNAL_AUTH_SECRET    ==  frontend INTERNAL_AUTH_SECRET
+backend RECORDING_AUTH_SECRET   ==  frontend RECORDING_AUTH_SECRET
 ```
 
-A mismatch usually shows up as silent **401**s with little explanation.
+A mismatch usually appears as silent **401**s or (for recording) videos of the sign-in page.
 
 ---
 
@@ -365,8 +402,11 @@ A mismatch usually shows up as silent **401**s with little explanation.
 
 - Python 3.12+
 - Node.js 20+ (recommended)
-- PostgreSQL running locally
-- GitHub OAuth App credentials (for UI sign-in)
+- PostgreSQL
+- GitHub OAuth App credentials
+- (Optional) ffmpeg + Playwright Chromium for demo assets
+- (Optional) Resend account for email alerts
+- (Optional) at least one LLM provider key for AI drafts/recommendations
 
 ### Terminal 1 — backend
 
@@ -374,12 +414,12 @@ A mismatch usually shows up as silent **401**s with little explanation.
 cd backend
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
-cp .env.example .env   # fill required vars (see above)
+cp .env.example .env          # fill required vars
 .venv/bin/alembic upgrade head
 .venv/bin/uvicorn app.main:app --reload --port 8000
 ```
 
-Check: [http://localhost:8000/api/health](http://localhost:8000/api/health) and [http://localhost:8000/docs](http://localhost:8000/docs).
+Check: [http://localhost:8000/api/health](http://localhost:8000/api/health) · [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ### Terminal 2 — frontend
 
@@ -394,17 +434,18 @@ Open: [http://localhost:3000](http://localhost:3000)
 
 ### Suggested smoke path
 
-1. Health endpoint OK
+1. Health OK
 2. Sign in with GitHub
-3. Add a repo in Settings
-4. Trigger a run on `/runs`
-5. Watch Overview / Recommendations update (SSE)
+3. Add a repo
+4. Trigger analytics on `/runs`
+5. Optionally trigger content / opportunities runs
+6. Review `/recommendations`, `/drafts`, `/opportunities`
+7. Confirm SSE updates without refresh
 
-Optional: regenerate OpenAPI types after backend schema changes:
+Regenerate types after API changes:
 
 ```bash
-cd frontend
-npm run generate:types   # backend must be on :8000
+cd frontend && npm run generate:types   # backend must be on :8000
 ```
 
 ---
@@ -423,29 +464,28 @@ npm run lint
 npx tsc --noEmit
 ```
 
+Recent Gate-2 baselines (see STATE.md): backend **219+** tests, frontend vitest **88+**, with `pip-audit` clean for runtime deps.
+
 ---
 
 ## Reusing patterns in other projects
 
-| Pattern                                     | Where to look                                 | Why reuse it                                     |
-| ------------------------------------------- | --------------------------------------------- | ------------------------------------------------ |
-| BFF proxy (browser never holds service key) | `frontend/app/api/*`, `lib/backend-client.ts` | Safer than calling private APIs from the browser |
-| Stable query keys                           | `frontend/lib/query-keys.ts`                  | One place to invalidate after CRUD               |
-| SSE → cache invalidation                    | `hooks/use-live-events.ts`                    | Multi-tab freshness without polling              |
-| Shell-first SSR pages                       | `frontend/app/**/page.tsx`                    | Instant chrome + data-slot skeletons             |
-| Isolated pipeline stages                    | `backend/app/pipeline/`                       | Failure isolation + testability                  |
-| LLM provider fallback                       | `backend/app/llm_router.py`                   | Survive rate limits / outages                    |
-| Draft-and-approve                           | `backend/app/api/drafts.py`                   | Human gate before external side effects          |
+| Pattern                               | Where to look                                 | Why reuse it                                       |
+| ------------------------------------- | --------------------------------------------- | -------------------------------------------------- |
+| BFF proxy (no service key in browser) | `frontend/app/api/*`, `lib/backend-client.ts` | Safer private API access                           |
+| Stable query keys                     | `frontend/lib/query-keys.ts`                  | One place to invalidate after CRUD                 |
+| SSE → cache invalidation              | `hooks/use-live-events.ts`                    | Multi-tab freshness                                |
+| Shell-first SSR pages                 | `frontend/app/**/page.tsx`                    | Instant chrome + data skeletons                    |
+| Isolated pipeline stages              | `backend/app/pipeline/`                       | Failure isolation                                  |
+| LLM provider fallback                 | `backend/app/llm_router.py`                   | Survive outages / rate limits                      |
+| Draft-and-approve                     | `backend/app/api/drafts.py`                   | Human gate before external side effects            |
+| Recording auth for headless UI        | `recording_auth.py`, `auth.ts` / `proxy.ts`   | Capture authenticated pages without a real session |
 
 Portable engineering rules (Next **and** Vite SPA): [`docs/PROJECT_IDEA.md`](docs/PROJECT_IDEA.md).
 
-Example invalidation idea after a mutation:
-
 ```ts
 await queryClient.invalidateQueries({ queryKey: queryKeys.repos.all });
-await queryClient.invalidateQueries({
-  queryKey: queryKeys.recommendations.all,
-});
+await queryClient.invalidateQueries({ queryKey: queryKeys.drafts.all });
 // SSE may invalidate the same keys in other open tabs
 ```
 
@@ -453,19 +493,20 @@ await queryClient.invalidateQueries({
 
 ## Keywords glossary
 
-| Term                      | Meaning                                                                                      |
-| ------------------------- | -------------------------------------------------------------------------------------------- |
-| **BFF**                   | Backend-for-frontend — Next Route Handlers that talk to FastAPI on the server.               |
-| **SSR**                   | Server-side rendering — HTML prepared on the server before the browser paints.               |
-| **RSC**                   | React Server Components — components that run on the server by default.                      |
-| **Hydration**             | Attaching React interactivity to server-rendered HTML; TanStack `dehydrate` seeds the cache. |
-| **SSE**                   | Server-Sent Events — one-way live stream from server to browser.                             |
-| **OpenAPI**               | Machine-readable API contract; used to generate TypeScript types.                            |
-| **Alembic**               | Database migration tool for SQLAlchemy.                                                      |
-| **Fernet**                | Symmetric encryption helper used for tokens at rest.                                         |
-| **Draft-and-approve**     | Write a proposal row first; human approves before external action.                           |
-| **LLMRouter**             | Tries multiple AI providers in order until one succeeds.                                     |
-| **Ad-blocker-safe paths** | Avoid URL segments that common blockers filter (`analytics`, `metrics`, …).                  |
+| Term                      | Meaning                                                                        |
+| ------------------------- | ------------------------------------------------------------------------------ |
+| **BFF**                   | Backend-for-frontend — Next Route Handlers calling FastAPI server-side.        |
+| **SSR / RSC**             | Server-rendered HTML / React Server Components.                                |
+| **Hydration**             | Attaching client React to SSR HTML; TanStack `dehydrate` seeds the cache.      |
+| **SSE**                   | Server-Sent Events — one-way live stream.                                      |
+| **OpenAPI**               | API contract used to generate TypeScript types.                                |
+| **Alembic**               | DB migrations for SQLAlchemy.                                                  |
+| **Fernet**                | Symmetric encryption for tokens at rest.                                       |
+| **Draft-and-approve**     | Write a proposal first; human approves before external action.                 |
+| **Opportunity**           | Dismissable community match (HN/Discussions) — not a Draft.                    |
+| **LLMRouter**             | Tries AI providers in order until one succeeds.                                |
+| **Recording token**       | Short-lived, repo-scoped proof so headless Chromium can view a dashboard page. |
+| **Ad-blocker-safe paths** | Avoid URL segments blockers filter (`analytics`, `metrics`, …).                |
 
 ---
 
@@ -487,9 +528,9 @@ await queryClient.invalidateQueries({
 ## Contributing / status
 
 - Treat this as a **work-in-progress** learning and production-bound codebase.
+- Phase 4 (4A–4G) is Gate-2 accepted; **deploy is not**. Live smoke tests (email, GitHub comment, demo recording) and `alembic upgrade head` on real Postgres are deferred to the Product Owner.
 - Read [`.agile-v/STATE.md`](.agile-v/STATE.md) before large changes.
-- Prefer small PRs; keep secrets out of git; follow `CLAUDE.md` hard constraints.
-- Ideas and polite issues/PRs are welcome once you can run the stack locally.
+- Keep secrets out of git; follow `CLAUDE.md` hard constraints.
 
 ---
 

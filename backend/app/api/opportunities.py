@@ -1,3 +1,11 @@
+"""Community opportunities inbox (HN + GitHub Discussions matches).
+
+Educational walkthrough
+-----------------------
+Unlike Drafts, opportunities are **dismissable only** — nothing here posts
+externally. Mirrors the Recommendation UX pattern, not draft-and-approve.
+"""
+
 from datetime import datetime
 
 from fastapi import APIRouter, Depends

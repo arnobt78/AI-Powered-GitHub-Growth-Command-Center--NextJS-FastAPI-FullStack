@@ -44,9 +44,11 @@ Git-tracked; verify with `git status`/`git log origin/main..HEAD` at next sessio
 
 ## Next Action
 
-Product Owner's entire authorized Phase 4 build sequence (4E → 4C → 4D → 4F → 4G) is now complete and Gate-2-accepted (GATE-0006 through GATE-0010). No further sub-project should be started without new explicit authorization from the Product Owner — this was the explicit instruction embedded in the build dispatch for the final sub-project.
+Product Owner's entire authorized Phase 4 build sequence (4E → 4C → 4D → 4F → 4G) is Gate-2-accepted (GATE-0006–0010). No new sub-project without explicit PO authorization.
 
-Remaining separately-gated work, all deliberately deferred to the Product Owner (unchanged pattern across every prior sub-project): (a) live manual browser smoke test of "Generate drafts" (Phase 4B); (b) `alembic upgrade head` against real Postgres (5 pending migrations: 4E's notification fields, 4C's last_release_tag, 4D's opportunities table, 4F's error_message, 4G's demo_assets table) + live email check + live GitHub-write verification + live demo-recording verification; (c) generating and setting `RECORDING_AUTH_SECRET` (matching value in both `backend/.env` and `frontend/.env.local`) plus installing `ffmpeg` and running `playwright install chromium --with-deps` on the deploy target — both new one-time deploy steps introduced by 4G; (d) VPS + Vercel deployment itself (separately gated per POL-0006); (e) cloud storage for demo assets and Reddit monitoring + LinkedIn/X/Reddit/Dev.to cross-posting remain explicitly deferred pending the Product Owner's own provider/app-registration decisions.
+Deferred to PO: live smokes (drafts/email/GitHub write/demo record); `alembic upgrade head` on real Postgres; `RECORDING_AUTH_SECRET` + ffmpeg/Playwright on deploy host; VPS+Vercel deploy (POL-0006); deferred Reddit/cross-post/cloud storage.
+
+**2026-07-26 docs/SEO hygiene (this session):** Educational README + SECURITY.md; educational code comments (no logic change); SEO metadata module + lint scripts; audit fixed `metadataBase` fallback (was wrongly portfolio). Tests: backend 219/219, frontend vitest 88/88, lint/tsc/build clean. Known non-blocking gaps (pre-existing): no UI for `POST /runs/opportunities`; no dedicated OG image; trigger-run 202 vs SSE race. Not a new Gate 2 — docs/hygiene only.
 
 ## Session Log — 2026-07-20 (continued)
 

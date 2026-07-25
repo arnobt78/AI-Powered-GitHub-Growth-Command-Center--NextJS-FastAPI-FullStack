@@ -1,14 +1,23 @@
+"""Analytics stage 1 — pull raw GitHub repo + traffic payloads into ``ctx.raw``.
+
+Educational walkthrough: later stages never call GitHub directly; they read
+from context. That keeps network I/O in one place and makes unit tests easier.
+"""
+
 from app.github_client import GitHubClient
 from app.pipeline.base import PipelineContext, Stage
 
 
 class Extractor(Stage):
+    """Fetch repo metadata, traffic, docs signals, and peer benchmarks."""
+
     name = "extractor"
 
     def __init__(self, gh_client: GitHubClient):
         self.gh_client = gh_client
 
     def run(self, ctx: PipelineContext) -> PipelineContext:
+        """Populate ``ctx.raw``; return the same context for the next stage."""
         owner, name = ctx.repo.owner, ctx.repo.name
         repo_data = self.gh_client.get_repo(owner, name)
 
@@ -27,6 +36,7 @@ class Extractor(Stage):
         return ctx
 
     def _get_benchmarks(self, repo_data: dict) -> list[dict]:
+        """Search for similar public repos by language + first topic (best-effort)."""
         language = repo_data.get("language") or ""
         topics = repo_data.get("topics") or []
         if not language or not topics:

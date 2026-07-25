@@ -1,3 +1,5 @@
+"""Analytics stage 3 — derive findings/signals from normalized metrics (no LLM yet)."""
+
 from app.pipeline.base import PipelineContext, Stage
 
 

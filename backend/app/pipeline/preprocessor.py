@@ -1,3 +1,5 @@
+"""Analytics stage 2 — normalize raw GitHub payloads into structured fields on the context."""
+
 from datetime import timezone, datetime
 
 from sqlalchemy import select

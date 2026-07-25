@@ -1,3 +1,17 @@
+"""Execute an ordered list of stages with per-stage failure isolation.
+
+Educational walkthrough
+-----------------------
+1. Insert a ``PipelineRun`` (status=running).
+2. For each stage: run → on exception ``db.rollback()`` then record error
+   (never assume the session is clean after a failed flush — CAPA-0001).
+3. Commit a ``StageRun`` row + publish ``stage_completed`` SSE.
+4. Mark the overall run ``ok`` or ``degraded`` if any stage failed.
+
+The same runner powers analytics, content, and opportunities by swapping the
+``stages`` list, ``context_factory``, and ``pipeline_kind``.
+"""
+
 from typing import Any, Callable
 import time
 from datetime import datetime, timezone
@@ -10,6 +24,8 @@ from app.pipeline.base import PipelineContext, Stage
 
 
 class PipelineRunner:
+    """Run stages sequentially for one repo; never abort the whole loop on one error."""
+
     def __init__(
         self,
         stages: list[Stage],
@@ -23,6 +39,7 @@ class PipelineRunner:
         self.pipeline_kind = pipeline_kind
 
     def run_for_repo(self, repo: Repo) -> Any:
+        """Execute all stages for ``repo`` and return the final context object."""
         run_row = PipelineRun(status="running", user_id=repo.user_id, pipeline_kind=self.pipeline_kind)
         self.db.add(run_row)
         self.db.commit()

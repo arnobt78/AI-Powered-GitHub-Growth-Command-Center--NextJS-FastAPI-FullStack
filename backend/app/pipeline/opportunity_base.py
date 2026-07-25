@@ -1,3 +1,5 @@
+"""Opportunities-pipeline context/stage contract (HN + Discussions; Draft-free)."""
+
 from dataclasses import dataclass, field
 from typing import Any
 

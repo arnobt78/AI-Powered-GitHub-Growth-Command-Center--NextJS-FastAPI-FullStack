@@ -1,3 +1,5 @@
+"""Wire content stages; daily/on-demand Draft generation entrypoints."""
+
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session

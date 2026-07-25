@@ -1,3 +1,10 @@
+/**
+ * Overview client UI — shell titles stay visible; cards hydrate from RQ cache.
+ *
+ * Educational walkthrough: this is `"use client"` because it uses hooks and
+ * interactive dialogs. Data was often prefetched in `app/page.tsx` already.
+ */
+
 "use client";
 
 import { FolderGit2 } from "lucide-react";

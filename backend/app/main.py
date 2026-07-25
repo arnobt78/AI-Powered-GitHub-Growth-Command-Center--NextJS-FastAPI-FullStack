@@ -1,3 +1,19 @@
+"""FastAPI application entrypoint for GitHub Growth Bot.
+
+Educational walkthrough
+-----------------------
+- `lifespan` starts APScheduler jobs when the process boots and shuts them down
+  cleanly on exit (preferred over deprecated `@app.on_event`).
+- Three heavy daily jobs (analytics, content, opportunities) are *staggered*
+  so they do not all hit GitHub/LLM rate limits at once.
+- Demo-asset cleanup is a cheap local FS/DB job — shorter offset is fine.
+- Routers are mounted below; nearly all require `Authorization: Bearer <API_KEY>`
+  (see `app.deps.require_api_key`). Only `GET /api/health` is public.
+- CORS origins come from settings so local Next.js (`:3000`) and production
+  frontend domains can call this API from the browser *only via the BFF* for
+  authenticated traffic (the browser never holds API_KEY).
+"""
+
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
@@ -28,10 +44,13 @@ from app.demo_asset_jobs import cleanup_expired_demo_assets
 
 settings = get_settings()
 
+# In-process scheduler (same OS process as uvicorn). Fine for a single-instance
+# personal SaaS; multi-instance deploys would need an external lock/queue later.
 scheduler = BackgroundScheduler()
 
 
 def _scheduled_pipeline_run() -> None:
+    """Daily analytics pipeline for every tracked repo (stars/traffic/recs)."""
     db = SessionLocal()
     try:
         run_pipeline_for_all_repos(db, notify=True)
@@ -40,6 +59,7 @@ def _scheduled_pipeline_run() -> None:
 
 
 def _scheduled_content_pipeline_run() -> None:
+    """Daily content pipeline — writes Draft rows for human approve/reject."""
     db = SessionLocal()
     try:
         run_content_pipeline_for_all_repos(db, notify=True)
@@ -48,6 +68,7 @@ def _scheduled_content_pipeline_run() -> None:
 
 
 def _scheduled_opportunities_run() -> None:
+    """Daily HN + Discussions scan — writes dismissable Opportunity rows."""
     db = SessionLocal()
     try:
         run_opportunities_pipeline_for_all_repos(db)
@@ -56,6 +77,7 @@ def _scheduled_opportunities_run() -> None:
 
 
 def _scheduled_demo_asset_cleanup() -> None:
+    """Delete expired demo mp4 files + DB rows (retention days from settings)."""
     db = SessionLocal()
     try:
         cleanup_expired_demo_assets(db)
@@ -65,6 +87,7 @@ def _scheduled_demo_asset_cleanup() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Register interval jobs, start scheduler, then yield to serve requests."""
     scheduler.add_job(_scheduled_pipeline_run, "interval", hours=24, id="daily_pipeline_run")
     # Offset 12h from the analytics job's default first-run time so the two
     # daily jobs don't both fire at once and contend for the same LLM
@@ -103,6 +126,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="GitHub Growth Bot API", lifespan=lifespan)
 
+# slowapi stores the limiter on app.state; handlers turn 429 into JSON responses.
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -113,6 +137,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Feature routers — path prefixes live on each APIRouter (e.g. /repos, /runs).
 app.include_router(repos_router)
 app.include_router(insights_router)
 app.include_router(recommendations_router)
@@ -128,4 +153,5 @@ app.include_router(demo_assets_video_router)
 
 @app.get("/api/health")
 def health() -> dict[str, str]:
+    """Liveness probe — intentionally unauthenticated for load balancers/Coolify."""
     return {"status": "ok"}

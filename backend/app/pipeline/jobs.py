@@ -1,3 +1,5 @@
+"""Wire analytics stages + GitHub client; run for one repo or all tracked repos."""
+
 from sqlalchemy.orm import Session
 
 from app.config import get_settings

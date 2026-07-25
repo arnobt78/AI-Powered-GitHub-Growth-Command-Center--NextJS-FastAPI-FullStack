@@ -1,3 +1,8 @@
+/**
+ * Mounts the SSE listener once for the whole authenticated app shell.
+ * Also shows a one-time welcome toast per browser session.
+ */
+
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
@@ -6,6 +11,7 @@ import { toast } from "sonner";
 import { useLiveEvents } from "@/hooks/use-live-events";
 
 export function LiveEventsProvider({ children }: { children: ReactNode }) {
+  // Opens EventSource and wires EVENT_QUERY_MAP invalidations.
   useLiveEvents();
 
   const { status, data } = useSession();

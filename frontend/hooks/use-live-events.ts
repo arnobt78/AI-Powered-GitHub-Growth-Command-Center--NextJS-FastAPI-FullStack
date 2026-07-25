@@ -1,3 +1,15 @@
+/**
+ * SSE → TanStack Query bridge (client-only).
+ *
+ * Educational walkthrough
+ * -----------------------
+ * Opens `EventSource("/api/events")` when authenticated. Each named backend
+ * event invalidates the mapped query keys so Overview, inboxes, Runs, etc.
+ * stay fresh across tabs without `router.refresh()` or full reloads.
+ *
+ * Keep EVENT_QUERY_MAP in parity with backend `broadcaster.publish(...)` call sites.
+ */
+
 "use client";
 
 import { useEffect } from "react";

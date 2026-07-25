@@ -1,3 +1,5 @@
+"""Thin GitHub REST/GraphQL client used by pipelines (read + gated write helpers)."""
+
 import base64
 import time
 

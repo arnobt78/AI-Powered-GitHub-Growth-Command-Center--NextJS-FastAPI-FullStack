@@ -1,3 +1,11 @@
+/**
+ * BFF proxy for the backend SSE stream.
+ *
+ * Educational walkthrough: the browser connects to `/api/events` (same origin).
+ * This handler attaches API key + internal user token and pipes the FastAPI
+ * EventSource response through — secrets never leave the server.
+ */
+
 import { auth } from "@/auth";
 import { mintInternalUserToken } from "@/lib/internal-auth";
 
@@ -13,6 +21,7 @@ export async function GET() {
   const baseUrl = process.env.BACKEND_URL ?? "http://localhost:8000";
   const apiKey = process.env.BACKEND_API_KEY ?? "";
 
+  // Stream from FastAPI; do not buffer the whole response in memory.
   const backendResponse = await fetch(`${baseUrl}/events`, {
     headers: {
       Authorization: `Bearer ${apiKey}`,

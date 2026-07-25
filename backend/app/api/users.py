@@ -1,3 +1,12 @@
+"""User provisioning and profile/notification preferences.
+
+Educational walkthrough
+-----------------------
+- ``POST /users/upsert`` — called from Auth.js JWT callback on first sign-in
+  (API key only; no internal user token yet). Encrypts the GitHub access token.
+- ``GET/PATCH /users/me`` — notification email prefs for Phase 4E alerts.
+"""
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy import select

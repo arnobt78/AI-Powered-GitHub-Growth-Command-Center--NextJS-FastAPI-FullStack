@@ -1,3 +1,5 @@
+"""HMAC mint/verify for X-Internal-User-Token shared with the Next.js BFF."""
+
 import base64
 import hashlib
 import hmac

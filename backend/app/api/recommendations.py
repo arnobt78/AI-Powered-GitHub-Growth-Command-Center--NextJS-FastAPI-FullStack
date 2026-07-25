@@ -1,3 +1,11 @@
+"""Growth recommendations produced by the analytics pipeline.
+
+Educational walkthrough
+-----------------------
+List + dismiss/update. Publishing ``recommendation_updated`` SSE keeps Overview
+badges and the recommendations page in sync across tabs.
+"""
+
 from datetime import datetime
 
 from fastapi import APIRouter, Depends

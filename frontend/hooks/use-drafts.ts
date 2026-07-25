@@ -1,3 +1,10 @@
+/**
+ * Drafts query + approve/reject mutation.
+ *
+ * Educational walkthrough: approving certain draft kinds triggers backend
+ * GitHub writes. Cache is patched locally; SSE `draft_updated` covers other tabs.
+ */
+
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -21,6 +28,7 @@ export function useReviewDraft() {
         body: JSON.stringify({ status }),
       }),
     onSuccess: (updated) => {
+      // Replace the row in-place so the inbox updates without a full list refetch.
       queryClient.setQueryData<Draft[]>(queryKeys.drafts.all, (current) =>
         current?.map((d) => (d.id === updated.id ? updated : d)) ?? [],
       );

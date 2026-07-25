@@ -1,3 +1,5 @@
+"""Analytics stage 5 — LLM narrative + draft recommendation candidates via LLMRouter."""
+
 import json
 
 from app.llm_router import LLMRouter

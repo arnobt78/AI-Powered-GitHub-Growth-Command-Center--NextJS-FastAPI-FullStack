@@ -1,3 +1,14 @@
+/**
+ * Root layout — persistent shell across navigations (nav, theme, providers).
+ *
+ * Educational walkthrough
+ * -----------------------
+ * Layout stays mounted when moving between pages → instant chrome.
+ * Providers (session, React Query, SSE live events, theme) wrap all pages once.
+ * No `loading.tsx` — feature pages skeleton data slots only, not this shell.
+ * SEO / Open Graph fields live in `lib/site-metadata.ts` (imported below).
+ */
+
 import type { Metadata } from "next";
 import { SessionProvider } from "next-auth/react";
 import { Toaster } from "@/components/ui/sonner";
@@ -8,12 +19,10 @@ import { QueryProvider } from "@/providers/query-provider";
 import { LiveEventsProvider } from "@/providers/live-events-provider";
 import { ThemeProvider } from "@/providers/theme-provider";
 import { geistSans, geistMono } from "@/lib/fonts";
+import { SITE_TITLE_SHORT, siteMetadata } from "@/lib/site-metadata";
 import "./globals.css";
 
-export const metadata: Metadata = {
-  title: "GitHub Growth Bot",
-  description: "Personal GitHub repo health, benchmarking, and recommendations dashboard.",
-};
+export const metadata: Metadata = siteMetadata;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -37,7 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     <header className="flex items-center justify-between border-b px-6 py-3">
                       <h1 className="flex items-center gap-2 text-base font-semibold">
                         <GithubIcon className="h-5 w-5" aria-hidden="true" />
-                        GitHub Growth Bot
+                        {SITE_TITLE_SHORT}
                       </h1>
                       <ThemeToggle />
                     </header>

@@ -1,3 +1,12 @@
+"""Pipeline run control plane — list, trigger, inspect stages.
+
+Educational walkthrough
+-----------------------
+``POST /runs``, ``/runs/content``, ``/runs/opportunities`` return **202** and
+schedule work via ``BackgroundTasks`` so the HTTP request does not wait for
+the full multi-stage pipeline. Rate-limited to protect LLM/GitHub quotas.
+"""
+
 from datetime import datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Request

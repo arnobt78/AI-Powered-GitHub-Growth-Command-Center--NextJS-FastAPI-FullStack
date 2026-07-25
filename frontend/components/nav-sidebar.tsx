@@ -1,3 +1,10 @@
+/**
+ * Primary app navigation — persistent across client navigations (layout).
+ *
+ * Educational walkthrough: uses Next.js `<Link>` (not buttons) so Cmd/Ctrl-click
+ * and prefetch work. Semantic icon colors match the feature each item represents.
+ */
+
 "use client";
 
 import { Bell, History, Inbox, LayoutDashboard, LogOut, Radar, Settings } from "lucide-react";

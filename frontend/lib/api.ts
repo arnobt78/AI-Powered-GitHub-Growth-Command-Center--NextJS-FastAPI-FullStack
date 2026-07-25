@@ -1,3 +1,11 @@
+/**
+ * Typed facade over `backendFetch` — one method per backend endpoint.
+ *
+ * Educational walkthrough: pages/hooks call `api.*` instead of raw URLs so
+ * path changes stay centralized. Types come from OpenAPI-generated helpers
+ * in `lib/api-types` (regenerate with `npm run generate:types`).
+ */
+
 import { backendFetch } from "@/lib/backend-client";
 import type {
   Benchmark,

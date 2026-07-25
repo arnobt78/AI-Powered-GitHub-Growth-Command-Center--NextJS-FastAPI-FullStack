@@ -1,3 +1,5 @@
+"""Analytics stage 4 — rank/prioritize findings before narrative generation."""
+
 from app.pipeline.base import PipelineContext, Stage
 
 

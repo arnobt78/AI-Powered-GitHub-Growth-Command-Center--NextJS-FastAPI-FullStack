@@ -1,3 +1,11 @@
+/**
+ * Repo list + add/delete mutations (client hooks calling Next.js BFF routes).
+ *
+ * Educational walkthrough: browser hits `/api/repos` (Route Handler), which
+ * proxies to FastAPI with the service API key. `onSuccess` updates the cache
+ * immediately; SSE keeps other tabs in sync.
+ */
+
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -18,6 +26,7 @@ export function useAddRepo() {
     mutationFn: (payload: RepoCreate) =>
       fetchJson<Repo>("/api/repos", { method: "POST", body: JSON.stringify(payload) }),
     onSuccess: (repo) => {
+      // Optimistic-feeling cache update without waiting for a refetch round-trip.
       queryClient.setQueryData<Repo[]>(queryKeys.repos.all, (current) => [...(current ?? []), repo]);
     },
   });

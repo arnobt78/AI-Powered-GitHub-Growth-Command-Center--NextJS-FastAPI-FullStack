@@ -1,3 +1,13 @@
+"""Draft-and-approve API — human gate before external side effects.
+
+Educational walkthrough
+-----------------------
+- ``GET`` lists the current user's drafts (content, release notes, replies, …).
+- ``PATCH`` with ``approved`` | ``rejected`` is the only way to progress.
+- Approving certain kinds (issue/discussion reply) may call GitHub write APIs
+  via ``GitHubClient`` — never from a pipeline stage directly.
+"""
+
 from datetime import datetime
 from typing import Literal
 

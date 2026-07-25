@@ -1,3 +1,14 @@
+/**
+ * Auth.js (NextAuth v5) configuration — GitHub OAuth + route gating.
+ *
+ * Educational walkthrough
+ * -----------------------
+ * - `authorized` runs from `proxy.ts` on matched routes; unauthenticated users
+ *   are redirected to `/sign-in` (except recording-token demo captures).
+ * - On first GitHub sign-in, `jwt` upserts the backend `User` (encrypts token).
+ * - Session exposes `user.id` as GitHub id for minting internal API tokens.
+ */
+
 import NextAuth from "next-auth";
 import GitHub from "next-auth/providers/github";
 import { isAuthorizedRecordingRequest } from "@/lib/recording-auth";

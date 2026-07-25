@@ -1,3 +1,12 @@
+"""Read-only insight endpoints nested under ``/repos/{id}/…``.
+
+Educational walkthrough
+-----------------------
+Path names deliberately avoid words ad-blockers filter (``analytics``,
+``metrics``, …). Use ``snapshots``, ``insights``, ``benchmarks``, ``referrers``,
+``popular-paths`` instead — see CLAUDE.md hard constraints.
+"""
+
 from datetime import date
 
 from fastapi import APIRouter, Depends

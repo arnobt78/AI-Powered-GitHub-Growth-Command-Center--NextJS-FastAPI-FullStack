@@ -1,3 +1,5 @@
+"""Fernet encrypt/decrypt for GitHub OAuth tokens at rest (never log plaintext)."""
+
 from cryptography.fernet import Fernet
 
 from app.config import get_settings

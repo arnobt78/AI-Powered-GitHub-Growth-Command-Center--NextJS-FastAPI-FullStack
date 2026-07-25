@@ -1,3 +1,7 @@
+/**
+ * Pipeline runs history + triggers (analytics / content / opportunities).
+ */
+
 import { QueryClient, dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";

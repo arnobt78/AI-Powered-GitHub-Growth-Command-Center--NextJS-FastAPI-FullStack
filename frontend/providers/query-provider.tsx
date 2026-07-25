@@ -1,3 +1,11 @@
+/**
+ * App-wide TanStack Query client.
+ *
+ * Educational walkthrough: create the client once with `useState` so React
+ * Strict Mode / remounts do not wipe the cache. `staleTime` reduces refetch
+ * thrash; window-focus refetch is off because SSE already pushes freshness.
+ */
+
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";

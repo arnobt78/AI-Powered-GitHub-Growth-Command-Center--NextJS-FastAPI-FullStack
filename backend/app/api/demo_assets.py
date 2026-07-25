@@ -1,3 +1,16 @@
+"""Demo asset (walkthrough video) generation and authenticated streaming.
+
+Educational walkthrough
+-----------------------
+1. ``POST /repos/{id}/demo-assets`` creates a ``generating`` row, mints a
+   short-lived recording token, and schedules Playwright+ffmpeg in the background.
+2. Headless Chromium opens the frontend with ``?recording_token=…`` (no cookie).
+3. ``GET /demo-assets/{id}/video`` streams the mp4 once ``status=ready``.
+
+Requires matching ``RECORDING_AUTH_SECRET`` on backend + frontend, plus
+``FRONTEND_BASE_URL``, ffmpeg, and Playwright Chromium on the host.
+"""
+
 import os
 from datetime import datetime
 

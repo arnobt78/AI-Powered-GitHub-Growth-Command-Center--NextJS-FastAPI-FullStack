@@ -1,3 +1,17 @@
+"""Multi-provider LLM fallback — resilience without hard vendor lock-in.
+
+Educational walkthrough
+-----------------------
+``chat_completion`` walks providers in a **policy-locked order** (Groq → Gemini →
+OpenRouter → Hugging Face → Cloudflare → Vercel AI Gateway). For each provider
+with a non-empty API key it tries listed models until one succeeds.
+
+- Near rate-limit providers are skipped via ``LLMUsage`` accounting.
+- Any single failure continues to the next model/provider — the pipeline must
+  not hard-crash because one SaaS is down.
+- Changing provider order / allowlists needs a Change Request (see CLAUDE.md).
+"""
+
 from dataclasses import dataclass
 from datetime import timezone, datetime
 
@@ -10,11 +24,13 @@ from app.models import LLMUsage
 
 
 class LLMRouterError(Exception):
-    pass
+    """Raised only after every configured provider/model attempt has failed."""
 
 
 @dataclass
 class ProviderConfig:
+    """One OpenAI-compatible chat endpoint + model allowlist."""
+
     name: str
     base_url: str
     api_key: str
@@ -23,12 +39,16 @@ class ProviderConfig:
 
 
 class LLMRouter:
+    """Try providers/models in order; record usage; raise if all fail."""
+
     def __init__(self, settings: Settings, db_session: Session, transport: httpx.BaseTransport | None = None):
         self.settings = settings
         self.db = db_session
+        # ``transport`` is injectable so unit tests can fake HTTP without the network.
         self._http = httpx.Client(transport=transport, timeout=30.0)
 
     def _providers(self) -> list[ProviderConfig]:
+        """Build the ordered candidate list, dropping providers with empty keys."""
         s = self.settings
         candidates = [
             ProviderConfig("groq", "https://api.groq.com/openai/v1", s.groq_api_key,
@@ -48,6 +68,11 @@ class LLMRouter:
         return [p for p in candidates if p.api_key]
 
     def chat_completion(self, messages: list[dict[str, str]], skip_providers: set[str] | None = None) -> str:
+        """Return assistant text from the first healthy provider/model.
+
+        ``skip_providers`` lets a caller exclude a provider that already failed
+        earlier in the same logical operation (e.g. synthesizer then validator).
+        """
         last_error: Exception | None = None
         skip_providers = skip_providers or set()
 
