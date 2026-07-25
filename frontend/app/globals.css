@@ -159,7 +159,26 @@
    `@apply glass` here throws "Cannot apply unknown utility class `glass`" at
    build time. Promoting these to @utility blocks to enable that composition
    would pull in variant-sorting machinery neither class needs, so the small
-   duplicated block is the simpler fix. */
+   duplicated block is the simpler fix.
+
+   Deliberately NOT !important on background-color/border-color: Tailwind
+   v4's compiled @layer order is theme, base, components, utilities —
+   utilities always outranks components regardless of source order, so on
+   Button's default/outline/secondary variants (which pair glass-interactive
+   with bg-primary/bg-background/bg-secondary + border-transparent for their
+   color identity) those utility classes win and paint over the glass
+   background/border; only the blur/shadow/hover-glow below actually render
+   on Button. This was checked deliberately (not missed) during Task 4's
+   contrast pass: forcing full translucency onto Button via !important was
+   tried and reverted, because it also made !important the base
+   background-color permanently beat each variant's non-important
+   hover:bg-*/80 utility, killing the hover color change entirely. The
+   result as shipped is the better outcome for a *contrast* pass anyway —
+   solid, opaque, high-contrast CTA buttons are correct for accessibility,
+   with blur+shadow+glow giving them a glass-adjacent frosted feel without
+   sacrificing legibility. Card/Chip/Input/Select have no competing
+   background/border utility in their own classNames, so they get full
+   translucency as intended. */
 @layer components {
   .glass {
     @apply backdrop-blur-md border;
