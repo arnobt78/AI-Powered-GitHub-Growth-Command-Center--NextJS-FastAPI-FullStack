@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { useDismissOpportunity, useOpportunities } from "@/hooks/use-opportunities";
 import { useRepos } from "@/hooks/use-repos";
+import { staggerDelay } from "@/lib/stagger";
 
 const SOURCE_LABELS: Record<string, string> = {
   hacker_news: "Hacker News",
@@ -37,8 +38,12 @@ export function OpportunitiesClient() {
         <EmptyState icon={Radar} title="No opportunities yet" description="They'll show up here once a mention is found." />
       ) : (
         <div className="space-y-2">
-          {visible?.map((opp) => (
-            <Card key={opp.id}>
+          {visible?.map((opp, index) => (
+            <Card
+              key={opp.id}
+              className="animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-backwards motion-reduce:animate-none"
+              style={staggerDelay(index)}
+            >
               <CardContent className="flex items-start justify-between gap-4 py-4">
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-medium text-muted-foreground">

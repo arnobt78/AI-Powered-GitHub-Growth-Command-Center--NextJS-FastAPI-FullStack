@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRunStages } from "@/hooks/use-run-stages";
 import type { PipelineRun } from "@/lib/api-types";
+import { staggerDelay } from "@/lib/stagger";
 
 const STATUS_META = {
   ok: { icon: CheckCircle2, color: "text-emerald-500", label: "OK" },
@@ -44,7 +45,12 @@ const STAGE_ORDER: Record<keyof typeof KIND_META, string[]> = {
   opportunities: ["opportunity_extractor", "opportunity_assembler"],
 };
 
-export function RunRow({ run }: { run: PipelineRun }) {
+// `index` defaults to 0 (rather than being required) so call sites that don't
+// care about list position — e.g. the Task 11 regression test rendering a
+// single RunRow in isolation — don't need to thread a meaningless value
+// through; mirrors the optional-prop-with-default pattern used by Card's
+// `size` prop (components/ui/card.tsx).
+export function RunRow({ run, index = 0 }: { run: PipelineRun; index?: number }) {
   const [expanded, setExpanded] = useState(false);
   const { data: stages, isPending } = useRunStages(run.id, expanded);
   const meta = STATUS_META[run.status as keyof typeof STATUS_META] ?? STATUS_META.running;
@@ -57,7 +63,10 @@ export function RunRow({ run }: { run: PipelineRun }) {
   const nextPendingIndex = STAGE_ORDER[kindKey].findIndex((name) => !completedNames.has(name));
 
   return (
-    <Card>
+    <Card
+      className="animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-backwards motion-reduce:animate-none"
+      style={staggerDelay(index)}
+    >
       <CardContent className="py-3">
         <button
           type="button"

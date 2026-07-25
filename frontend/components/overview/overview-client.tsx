@@ -4,6 +4,7 @@ import { FolderGit2 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { useRepos } from "@/hooks/use-repos";
+import { staggerDelay } from "@/lib/stagger";
 import { AddRepoDialog } from "@/components/overview/add-repo-dialog";
 import { RepoCard } from "@/components/overview/repo-card";
 
@@ -25,7 +26,15 @@ export function OverviewClient() {
         />
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {repos?.map((repo) => <RepoCard key={repo.id} repo={repo} />)}
+          {repos?.map((repo, index) => (
+            <div
+              key={repo.id}
+              className="animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-backwards motion-reduce:animate-none"
+              style={staggerDelay(index)}
+            >
+              <RepoCard repo={repo} />
+            </div>
+          ))}
         </div>
       )}
     </div>

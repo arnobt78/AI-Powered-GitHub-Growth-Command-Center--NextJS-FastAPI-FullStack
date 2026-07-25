@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { useDismissRecommendation, useRecommendations } from "@/hooks/use-recommendations";
 import { useRepos } from "@/hooks/use-repos";
+import { staggerDelay } from "@/lib/stagger";
 
 export function RecommendationsClient() {
   const { data: recommendations } = useRecommendations();
@@ -60,8 +61,12 @@ export function RecommendationsClient() {
         <EmptyState icon={CheckCircle2} title="Inbox zero" description="No open recommendations right now." />
       ) : (
         <div className="space-y-2">
-          {visible?.map((rec) => (
-            <Card key={rec.id}>
+          {visible?.map((rec, index) => (
+            <Card
+              key={rec.id}
+              className="animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-backwards motion-reduce:animate-none"
+              style={staggerDelay(index)}
+            >
               <CardContent className="flex items-start justify-between gap-4 py-4">
                 <div>
                   <p className="text-xs font-medium text-muted-foreground">{repoNameById.get(rec.repo_id) ?? `repo #${rec.repo_id}`}</p>

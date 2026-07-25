@@ -32,7 +32,9 @@ export function RunsClient() {
       {runs && runs.length === 0 ? (
         <EmptyState icon={History} title="No runs yet" description="Trigger one manually or wait for the daily schedule." />
       ) : (
-        <div className="space-y-2">{runs?.map((run) => <RunRow key={run.id} run={run} />)}</div>
+        <div className="space-y-2">
+          {runs?.map((run, index) => <RunRow key={run.id} run={run} index={index} />)}
+        </div>
       )}
     </div>
   );

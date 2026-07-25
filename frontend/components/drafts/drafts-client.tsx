@@ -10,6 +10,7 @@ import { SectionHeading } from "@/components/ui/section-heading";
 import { DraftContent } from "@/components/drafts/draft-content";
 import { useDrafts, useReviewDraft, useTriggerContentRun } from "@/hooks/use-drafts";
 import { useRepos } from "@/hooks/use-repos";
+import { staggerDelay } from "@/lib/stagger";
 import type { DraftKind } from "@/types/drafts";
 
 // `satisfies` gives compile-time exhaustiveness against DraftKind (a new kind
@@ -62,8 +63,12 @@ export function DraftsClient() {
         <EmptyState icon={Inbox} title="No drafts yet" description="Click 'Generate drafts' or wait for the daily schedule." />
       ) : (
         <div className="space-y-2">
-          {pending?.map((draft) => (
-            <Card key={draft.id}>
+          {pending?.map((draft, index) => (
+            <Card
+              key={draft.id}
+              className="animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-backwards motion-reduce:animate-none"
+              style={staggerDelay(index)}
+            >
               <CardContent className="flex items-start justify-between gap-4 py-4">
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-medium text-muted-foreground">
