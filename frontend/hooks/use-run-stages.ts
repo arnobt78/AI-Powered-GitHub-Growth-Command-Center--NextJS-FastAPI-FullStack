@@ -19,9 +19,16 @@ export function useRunStages(runId: number, enabled: boolean) {
 
     const source = new EventSource("/api/events");
     const handler = (event: MessageEvent) => {
-      const payload = JSON.parse(event.data) as { run_id: number; stage_name: string; status: string };
-      if (payload.run_id === runId) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.runs.stages(runId) });
+      // Live event stream — a malformed frame has nothing useful to recover
+      // to, so skip it silently rather than letting JSON.parse throw
+      // uncaught inside the listener and take down the subscription.
+      try {
+        const payload = JSON.parse(event.data) as { run_id: number; stage_name: string; status: string };
+        if (payload.run_id === runId) {
+          queryClient.invalidateQueries({ queryKey: queryKeys.runs.stages(runId) });
+        }
+      } catch {
+        // Ignore malformed frame.
       }
     };
     source.addEventListener("stage_completed", handler);

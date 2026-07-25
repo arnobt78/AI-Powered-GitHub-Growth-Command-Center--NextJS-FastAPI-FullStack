@@ -1,11 +1,12 @@
 "use client";
 
-import { AlertTriangle, BarChart3, CheckCircle2, ChevronDown, ChevronRight, Circle, Loader2, Radar, Sparkles } from "lucide-react";
+import { AlertTriangle, BarChart3, CheckCircle2, ChevronDown, ChevronRight, Circle, Loader2, Radar, Sparkles, XCircle } from "lucide-react";
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRunStages } from "@/hooks/use-run-stages";
-import type { PipelineRun } from "@/lib/api-types";
+import type { PipelineRun, StageRun } from "@/lib/api-types";
+import { semanticColor } from "@/lib/semantic-color";
 import { staggerDelay } from "@/lib/stagger";
 
 const STATUS_META = {
@@ -44,6 +45,31 @@ const STAGE_ORDER: Record<keyof typeof KIND_META, string[]> = {
   ],
   opportunities: ["opportunity_extractor", "opportunity_assembler"],
 };
+
+// A found/completed StageRun row — icon and status text both branch on the
+// row's actual `status` instead of hardcoding success, so a stage that
+// errored shows a red XCircle + red "error" text rather than a green
+// checkmark next to red text (a prior bug: the icon was a hardcoded
+// CheckCircle2 regardless of outcome).
+function StageRowLine({ stageRow }: { stageRow: StageRun }) {
+  const ok = stageRow.status === "ok";
+  const StatusIcon = ok ? CheckCircle2 : XCircle;
+  return (
+    <div className="text-sm">
+      <div className="flex items-center justify-between">
+        <span className="flex items-center gap-1.5">
+          <StatusIcon className={`h-3.5 w-3.5 ${ok ? "text-emerald-500" : "text-red-500"}`} aria-hidden="true" />
+          {stageRow.stage_name}
+        </span>
+        <span className="flex items-center gap-2 text-muted-foreground">
+          <span className="font-mono tabular-nums">{stageRow.duration_ms}ms</span>
+          <span className={ok ? semanticColor("positive") : semanticColor("negative")}>{stageRow.status}</span>
+        </span>
+      </div>
+      {stageRow.error && <p className="mt-0.5 text-xs text-red-500">{stageRow.error}</p>}
+    </div>
+  );
+}
 
 // `index` defaults to 0 (rather than being required) so call sites that don't
 // care about list position — e.g. the Task 11 regression test rendering a
@@ -92,27 +118,13 @@ export function RunRow({ run, index = 0 }: { run: PipelineRun; index?: number })
             {isPending ? (
               <Skeleton className="h-20 w-full" />
             ) : (
-              STAGE_ORDER[kindKey].map((stageName, index) => {
+              STAGE_ORDER[kindKey].map((stageName, stageIndex) => {
                 const stageRow = stages?.find((s) => s.stage_name === stageName);
-                const isActive = run.status === "running" && index === nextPendingIndex;
-                const isPendingStage = run.status === "running" && index > nextPendingIndex;
+                const isActive = run.status === "running" && stageIndex === nextPendingIndex;
+                const isPendingStage = run.status === "running" && stageIndex > nextPendingIndex;
 
                 if (stageRow) {
-                  return (
-                    <div key={stageName} className="text-sm">
-                      <div className="flex items-center justify-between">
-                        <span className="flex items-center gap-1.5">
-                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" aria-hidden="true" />
-                          {stageRow.stage_name}
-                        </span>
-                        <span className="flex items-center gap-2 text-muted-foreground">
-                          {stageRow.duration_ms}ms
-                          <span className={stageRow.status === "ok" ? "text-emerald-500" : "text-red-500"}>{stageRow.status}</span>
-                        </span>
-                      </div>
-                      {stageRow.error && <p className="mt-0.5 text-xs text-red-500">{stageRow.error}</p>}
-                    </div>
-                  );
+                  return <StageRowLine key={stageName} stageRow={stageRow} />;
                 }
 
                 return (
@@ -127,6 +139,15 @@ export function RunRow({ run, index = 0 }: { run: PipelineRun; index?: number })
                 );
               })
             )}
+            {/* Defensive fallback: a stage the backend actually reported that
+                isn't in this kind's known STAGE_ORDER list (e.g. the backend
+                added/renamed a stage without a matching frontend update, as
+                already happened once in Task 11) still renders instead of
+                silently vanishing — it clearly completed, since a real
+                StageRun row exists for it. */}
+            {stages
+              ?.filter((s) => !STAGE_ORDER[kindKey].includes(s.stage_name))
+              .map((stageRow) => <StageRowLine key={stageRow.stage_name} stageRow={stageRow} />)}
           </div>
         )}
       </CardContent>
