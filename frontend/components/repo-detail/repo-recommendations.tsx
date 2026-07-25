@@ -38,7 +38,7 @@ export function RepoRecommendations({ repoId }: { repoId: number }) {
                   onClick={() =>
                     dismiss.mutate(
                       { id: rec.id, dismissed: true },
-                      { onError: () => toast.error("Could not dismiss — try again.") },
+                      { onError: () => toast.error("Could not dismiss recommendation", { description: "Please try again." }) },
                     )
                   }
                   disabled={dismiss.isPending}

@@ -18,7 +18,7 @@ export function DeleteRepoButton({ repo }: { repo: Repo }) {
       aria-label={`Stop tracking ${repo.owner}/${repo.name}`}
       onClick={() =>
         deleteRepo.mutate(repo.id, {
-          onError: () => toast.error(`Could not stop tracking ${repo.owner}/${repo.name} — try again.`),
+          onError: () => toast.error("Could not stop tracking repo", { description: `${repo.owner}/${repo.name} — please try again.` }),
         })
       }
       disabled={deleteRepo.isPending}

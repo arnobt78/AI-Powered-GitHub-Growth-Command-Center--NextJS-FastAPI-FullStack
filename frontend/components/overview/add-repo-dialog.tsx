@@ -47,13 +47,13 @@ export function AddRepoDialog() {
       { owner, name },
       {
         onSuccess: () => {
-          toast.success(`Now tracking ${owner}/${name}`);
+          toast.success("Repo added", { description: `Now tracking ${owner}/${name}.` });
           setOwner("");
           setName("");
           setUrl("");
           setOpen(false);
         },
-        onError: () => toast.error("Could not add that repo — check the owner/name and try again."),
+        onError: () => toast.error("Could not add repo", { description: "Check the owner/name and try again." }),
       },
     );
   }

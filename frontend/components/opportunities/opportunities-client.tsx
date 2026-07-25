@@ -58,7 +58,7 @@ export function OpportunitiesClient() {
                   onClick={() =>
                     dismiss.mutate(
                       { id: opp.id, dismissed: true },
-                      { onError: () => toast.error("Could not dismiss — try again.") },
+                      { onError: () => toast.error("Could not dismiss opportunity", { description: "Please try again." }) },
                     )
                   }
                   disabled={dismiss.isPending}

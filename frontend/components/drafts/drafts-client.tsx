@@ -47,8 +47,8 @@ export function DraftsClient() {
         <Button
           onClick={() =>
             triggerContentRun.mutate(undefined, {
-              onSuccess: () => toast.success("Content generation started"),
-              onError: () => toast.error("Could not start content generation"),
+              onSuccess: () => toast.success("Content generation started", { description: "Drafts will appear here shortly." }),
+              onError: () => toast.error("Could not start content generation", { description: "Please try again." }),
             })
           }
           disabled={triggerContentRun.isPending}
@@ -87,12 +87,12 @@ export function DraftsClient() {
                         {
                           onSuccess: (updated) => {
                             if (updated.status === "posted") {
-                              toast.success("Reply posted to GitHub");
+                              toast.success("Reply posted to GitHub", { description: "Your approved reply is now live." });
                             } else if (updated.status === "failed") {
-                              toast.error(`Could not post: ${updated.error_message}`);
+                              toast.error("Could not post reply", { description: updated.error_message ?? "Unknown error." });
                             }
                           },
-                          onError: () => toast.error("Could not approve — try again."),
+                          onError: () => toast.error("Could not approve draft", { description: "Please try again." }),
                         },
                       )
                     }
@@ -107,7 +107,7 @@ export function DraftsClient() {
                     onClick={() =>
                       review.mutate(
                         { id: draft.id, status: "rejected" },
-                        { onError: () => toast.error("Could not reject — try again.") },
+                        { onError: () => toast.error("Could not reject draft", { description: "Please try again." }) },
                       )
                     }
                     disabled={review.isPending}

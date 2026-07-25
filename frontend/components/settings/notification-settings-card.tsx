@@ -20,7 +20,7 @@ export function NotificationSettingsCard() {
     const trimmed = value.trim();
     updateMe.mutate(
       { notification_email: trimmed || null },
-      { onError: () => toast.error("Could not update notification email — try again.") },
+      { onError: () => toast.error("Could not update notification email", { description: "Please try again." }) },
     );
   };
 

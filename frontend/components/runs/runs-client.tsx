@@ -19,8 +19,8 @@ export function RunsClient() {
         <Button
           onClick={() =>
             triggerRun.mutate(undefined, {
-              onSuccess: () => toast.success("Pipeline run triggered"),
-              onError: () => toast.error("Could not trigger a run"),
+              onSuccess: () => toast.success("Pipeline run triggered", { description: "This may take a few minutes." }),
+              onError: () => toast.error("Could not trigger a run", { description: "Please try again." }),
             })
           }
           disabled={triggerRun.isPending}

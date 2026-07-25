@@ -25,7 +25,7 @@ export function DemoAssetsSection({ repoId }: { repoId: number }) {
         <SectionHeading icon={Clapperboard} title="Demo Assets" iconColor="text-cyan-500" />
         <Button
           onClick={() =>
-            trigger.mutate(undefined, { onError: () => toast.error("Could not start demo generation") })
+            trigger.mutate(undefined, { onError: () => toast.error("Could not start demo generation", { description: "Please try again." }) })
           }
           disabled={trigger.isPending}
         >

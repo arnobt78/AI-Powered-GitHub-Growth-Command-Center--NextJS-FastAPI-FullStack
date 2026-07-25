@@ -62,7 +62,7 @@ describe("DraftsClient approve toast behavior", () => {
     mockHooksWithReview([{ ...baseDraft, kind: "issue_reply", target: "issue:42", content: { suggested: "Thanks!", reason: "ack" } }], mutate);
     render(<DraftsClient />);
     fireEvent.click(screen.getAllByRole("button", { name: /approve/i })[0]);
-    expect(mockToastSuccess).toHaveBeenCalledWith(expect.stringMatching(/posted/i));
+    expect(mockToastSuccess).toHaveBeenCalledWith(expect.stringMatching(/posted/i), expect.anything());
   });
 
   it("shows an error toast with the failure reason when approving results in status failed", () => {
@@ -70,7 +70,7 @@ describe("DraftsClient approve toast behavior", () => {
     mockHooksWithReview([{ ...baseDraft, kind: "issue_reply", target: "issue:42", content: { suggested: "Thanks!", reason: "ack" } }], mutate);
     render(<DraftsClient />);
     fireEvent.click(screen.getAllByRole("button", { name: /approve/i })[0]);
-    expect(mockToastError).toHaveBeenCalledWith(expect.stringContaining("GitHub API unavailable"));
+    expect(mockToastError).toHaveBeenCalledWith(expect.stringContaining("Could not post"), { description: "GitHub API unavailable" });
   });
 
   it("shows no posted/failed toast for a non-posting kind like readme_suggestion", () => {
