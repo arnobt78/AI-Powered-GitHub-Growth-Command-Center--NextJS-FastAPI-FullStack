@@ -5,9 +5,10 @@ import {
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
+  getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { Search } from "lucide-react";
+import { ArrowDown, ArrowUp, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -30,11 +31,13 @@ export function DataTable<TData, TValue>({
   searchPlaceholder: string;
   filters?: { columnId: string; label: string; options: { label: string; value: string }[] }[];
 }) {
+  // eslint-disable-next-line react-hooks/incompatible-library -- known, harmless React Compiler / TanStack Table interaction (useReactTable() returns functions the compiler can't safely memoize); confirmed non-blocking by two independent task reviewers during this plan's implementation.
   const table = useReactTable({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    getSortedRowModel: getSortedRowModel(),
   });
 
   return (
@@ -52,6 +55,21 @@ export function DataTable<TData, TValue>({
         {filters?.map((filter) => (
           <Select
             key={filter.columnId}
+            // Base UI's Select.Root only resolves the trigger's displayed
+            // label from this `items` prop (a value -> label record/array) —
+            // it does NOT infer labels from mounted SelectItem children.
+            // Without it, the trigger falls back to stringifying the raw
+            // filter value ("all"/"active"/"idle") instead of showing
+            // "All usage"/"Active"/"Idle". Verified directly against
+            // node_modules/@base-ui/react/select/root/SelectRoot.d.ts (the
+            // `items` prop's own doc comment shows this exact
+            // Record<string, ReactNode> shape) and
+            // .../internals/resolveValueLabel.js's resolveSelectedLabel,
+            // which SelectValue calls with the store's `items`.
+            items={{
+              all: `All ${filter.label}`,
+              ...Object.fromEntries(filter.options.map((option) => [option.value, option.label])),
+            }}
             value={(table.getColumn(filter.columnId)?.getFilterValue() as string) ?? "all"}
             onValueChange={(value) =>
               table.getColumn(filter.columnId)?.setFilterValue(value === "all" ? undefined : value)
@@ -75,11 +93,31 @@ export function DataTable<TData, TValue>({
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id}>
-              {headerGroup.headers.map((header) => (
-                <TableHead key={header.id}>
-                  {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
-                </TableHead>
-              ))}
+              {headerGroup.headers.map((header) => {
+                // TanStack Table columns are sortable by default unless a
+                // column explicitly opts out (`enableSorting: false`) — no
+                // per-column wiring needed for the 4 tables that consume
+                // DataTable, sorting just works once it's here.
+                const canSort = header.column.getCanSort();
+                const sortDirection = header.column.getIsSorted();
+                return (
+                  <TableHead key={header.id}>
+                    {header.isPlaceholder ? null : canSort ? (
+                      <button
+                        type="button"
+                        onClick={header.column.getToggleSortingHandler()}
+                        className="flex items-center gap-1 hover:text-foreground"
+                      >
+                        {flexRender(header.column.columnDef.header, header.getContext())}
+                        {sortDirection === "asc" && <ArrowUp className="h-3.5 w-3.5" aria-hidden="true" />}
+                        {sortDirection === "desc" && <ArrowDown className="h-3.5 w-3.5" aria-hidden="true" />}
+                      </button>
+                    ) : (
+                      flexRender(header.column.columnDef.header, header.getContext())
+                    )}
+                  </TableHead>
+                );
+              })}
             </TableRow>
           ))}
         </TableHeader>
