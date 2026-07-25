@@ -147,7 +147,7 @@ export function RunRow({ run, index = 0 }: { run: PipelineRun; index?: number })
                 StageRun row exists for it. */}
             {stages
               ?.filter((s) => !STAGE_ORDER[kindKey].includes(s.stage_name))
-              .map((stageRow) => <StageRowLine key={stageRow.stage_name} stageRow={stageRow} />)}
+              .map((stageRow) => <StageRowLine key={stageRow.id} stageRow={stageRow} />)}
           </div>
         )}
       </CardContent>

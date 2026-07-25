@@ -41,4 +41,22 @@ describe("RunRow content-kind stage rendering", () => {
     expect(screen.getByText("321ms")).toBeInTheDocument();
     expect(screen.getByText("ok")).toBeInTheDocument();
   });
+
+  // Regression test for the failed-stage-shows-green-checkmark bug (final
+  // whole-branch review finding): StageRowLine used to hardcode CheckCircle2
+  // + text-emerald-500 regardless of stageRow.status, so an errored stage
+  // showed a green success checkmark next to red "error" text. Against that
+  // bug this test's icon-color assertion would fail (icon stays emerald).
+  it("renders a red icon, not a green checkmark, for a failed stage", () => {
+    mockUseRunStages([
+      { id: 2, stage_name: "content_extractor", status: "error", duration_ms: 45, error: "boom" },
+    ]);
+
+    render(<RunRow run={contentRun} />);
+    fireEvent.click(screen.getByRole("button", { name: /Run #7/i }));
+
+    const icon = screen.getByText("content_extractor").parentElement?.querySelector("svg");
+    expect(icon).toHaveClass("text-red-500");
+    expect(icon).not.toHaveClass("text-emerald-500");
+  });
 });
