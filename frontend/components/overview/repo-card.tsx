@@ -11,6 +11,7 @@ import { SafeImage } from "@/components/safe-image";
 import { DeleteRepoButton } from "@/components/overview/delete-repo-button";
 import { useRepoSnapshots } from "@/hooks/use-repo-snapshots";
 import { useRepoInsights } from "@/hooks/use-repo-insights";
+import { semanticColor } from "@/lib/semantic-color";
 import type { Repo } from "@/lib/api-types";
 
 export function RepoCard({ repo }: { repo: Repo }) {
@@ -60,7 +61,9 @@ export function RepoCard({ repo }: { repo: Repo }) {
             icon={Lightbulb}
             label="Open recommendations"
             value={`${insights.recommendation_count} open recommendation${insights.recommendation_count === 1 ? "" : "s"}`}
-            color="text-amber-500"
+            // Few open recommendations reads as a mild warning; a growing
+            // backlog (3+) escalates to negative so it visually demands attention.
+            color={insights.recommendation_count >= 3 ? semanticColor("negative") : semanticColor("warning")}
           />
         )}
       </CardContent>
