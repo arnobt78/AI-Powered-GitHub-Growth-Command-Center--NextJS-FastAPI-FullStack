@@ -24,7 +24,9 @@ const columns: ColumnDef<ProviderStatus>[] = [
       return filterValue === "active" ? calls > 0 : calls === 0;
     },
     cell: ({ row }) => (
-      <span className={row.original.calls_today > 0 ? semanticColor("neutral") : "text-muted-foreground"}>
+      <span
+        className={`font-mono tabular-nums ${row.original.calls_today > 0 ? semanticColor("neutral") : "text-muted-foreground"}`}
+      >
         {row.original.calls_today}
       </span>
     ),

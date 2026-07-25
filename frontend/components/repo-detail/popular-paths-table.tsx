@@ -11,8 +11,8 @@ import type { PopularPath } from "@/lib/api-types";
 
 const columns: ColumnDef<PopularPath>[] = [
   { accessorKey: "path", header: "Path", cell: ({ row }) => <span className="font-mono text-xs">{row.original.path}</span> },
-  { accessorKey: "count", header: "Views" },
-  { accessorKey: "uniques", header: "Uniques" },
+  { accessorKey: "count", header: "Views", cell: ({ row }) => <span className="font-mono tabular-nums">{row.original.count}</span> },
+  { accessorKey: "uniques", header: "Uniques", cell: ({ row }) => <span className="font-mono tabular-nums">{row.original.uniques}</span> },
 ];
 
 export function PopularPathsTable({ repoId }: { repoId: number }) {

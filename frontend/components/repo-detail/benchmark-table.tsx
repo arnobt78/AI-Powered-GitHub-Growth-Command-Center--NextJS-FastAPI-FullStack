@@ -11,8 +11,8 @@ import type { Benchmark } from "@/lib/api-types";
 
 const columns: ColumnDef<Benchmark>[] = [
   { accessorKey: "full_name", header: "Repo" },
-  { accessorKey: "stars", header: "Stars" },
-  { accessorKey: "forks", header: "Forks" },
+  { accessorKey: "stars", header: "Stars", cell: ({ row }) => <span className="font-mono tabular-nums">{row.original.stars}</span> },
+  { accessorKey: "forks", header: "Forks", cell: ({ row }) => <span className="font-mono tabular-nums">{row.original.forks}</span> },
   { accessorKey: "topics", header: "Topics", cell: ({ row }) => row.original.topics.join(", ") },
 ];
 

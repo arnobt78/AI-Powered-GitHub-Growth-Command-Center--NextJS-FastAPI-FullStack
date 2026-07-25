@@ -51,9 +51,9 @@ export function RepoCard({ repo }: { repo: Repo }) {
           </div>
         )}
         <div className="flex items-center justify-between">
-          <StatBadge icon={Star} label="Stars" value={latest?.stars ?? 0} color="text-amber-500" />
-          <StatBadge icon={GitFork} label="Forks" value={latest?.forks ?? 0} color="text-violet-500" />
-          <StatBadge icon={Eye} label="Watchers" value={latest?.watchers ?? 0} color="text-emerald-500" />
+          <StatBadge icon={Star} label="Stars" value={latest?.stars ?? 0} color="text-amber-500" mono />
+          <StatBadge icon={GitFork} label="Forks" value={latest?.forks ?? 0} color="text-violet-500" mono />
+          <StatBadge icon={Eye} label="Watchers" value={latest?.watchers ?? 0} color="text-emerald-500" mono />
           <DeltaBadge value={starDelta} label="Stars change since last snapshot" />
         </div>
         {insights && insights.recommendation_count > 0 && (

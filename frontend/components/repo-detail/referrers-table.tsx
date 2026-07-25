@@ -11,8 +11,8 @@ import type { Referrer } from "@/lib/api-types";
 
 const columns: ColumnDef<Referrer>[] = [
   { accessorKey: "referrer", header: "Source" },
-  { accessorKey: "count", header: "Views" },
-  { accessorKey: "uniques", header: "Uniques" },
+  { accessorKey: "count", header: "Views", cell: ({ row }) => <span className="font-mono tabular-nums">{row.original.count}</span> },
+  { accessorKey: "uniques", header: "Uniques", cell: ({ row }) => <span className="font-mono tabular-nums">{row.original.uniques}</span> },
 ];
 
 export function ReferrersTable({ repoId }: { repoId: number }) {
