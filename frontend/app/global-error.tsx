@@ -1,9 +1,19 @@
 "use client";
 
+import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
+
 // Only fires if the root layout itself throws (rare — layout.tsx has no
 // data-fetching), so it must render its own <html>/<body> since it replaces
 // the entire root layout rather than nesting inside it like app/error.tsx.
+// It's a separate boundary from error.tsx (the layout crashing means
+// error.tsx's own nesting inside that layout is gone too), so it needs its
+// own Sentry.captureException call — the app/error.tsx one never fires here.
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  useEffect(() => {
+    Sentry.captureException(error);
+  }, [error]);
+
   return (
     <html lang="en">
       <body>
