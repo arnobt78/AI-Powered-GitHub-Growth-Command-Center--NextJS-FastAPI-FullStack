@@ -80,7 +80,8 @@ def test_skips_repos_for_user_with_undecryptable_token(mock_publish, seed_user):
     run_content_pipeline_for_all_repos(db, user_id=seed_user)
 
     assert db.query(Draft).count() == 0
-    mock_publish.assert_not_called()
+    # On-demand still publishes so the UI kickoff toast closes (no repos ran).
+    mock_publish.assert_any_call("drafts_generated", {}, user_id=seed_user)
     db.close()
 
 
@@ -141,3 +142,19 @@ def test_notify_true_skips_when_zero_drafts_created(mock_publish, mock_notify, s
     db.close()
 
     mock_notify.assert_not_called()
+
+
+@patch("app.pipeline.content_jobs.broadcaster.publish")
+def test_on_demand_publishes_even_with_zero_repos(mock_publish, seed_user):
+    db = SessionLocal()
+    run_content_pipeline_for_all_repos(db, user_id=seed_user)
+    mock_publish.assert_any_call("drafts_generated", {}, user_id=seed_user)
+    db.close()
+
+
+@patch("app.pipeline.content_jobs.broadcaster.publish")
+def test_scheduled_batch_skips_publish_when_no_repos_processed(mock_publish, seed_user):
+    db = SessionLocal()
+    run_content_pipeline_for_all_repos(db)  # user_id=None
+    mock_publish.assert_not_called()
+    db.close()

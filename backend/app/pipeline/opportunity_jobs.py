@@ -60,5 +60,10 @@ def run_opportunities_pipeline_for_all_repos(db: Session, user_id: int | None = 
 
         processed_user_ids.add(repo.user_id)
 
-    for uid in processed_user_ids:
-        broadcaster.publish("opportunities_generated", {}, user_id=uid)
+    # On-demand: always signal the requester (closes loading toast even if
+    # every repo was skipped). Scheduled: only users who processed a repo.
+    if user_id is not None:
+        broadcaster.publish("opportunities_generated", {}, user_id=user_id)
+    else:
+        for uid in processed_user_ids:
+            broadcaster.publish("opportunities_generated", {}, user_id=uid)

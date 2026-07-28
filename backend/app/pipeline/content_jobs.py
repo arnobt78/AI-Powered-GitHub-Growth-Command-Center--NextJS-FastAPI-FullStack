@@ -82,8 +82,14 @@ def run_content_pipeline_for_all_repos(db: Session, user_id: int | None = None, 
 
         processed_user_ids.add(repo.user_id)
 
-    for uid in processed_user_ids:
-        broadcaster.publish("drafts_generated", {}, user_id=uid)
+    # On-demand (user_id set): always publish so the kickoff toast/SSE cycle
+    # closes even when every repo was skipped (none tracked / needs_reauth).
+    # Scheduled batch (user_id None): only users who actually ran a repo.
+    if user_id is not None:
+        broadcaster.publish("drafts_generated", {}, user_id=user_id)
+    else:
+        for uid in processed_user_ids:
+            broadcaster.publish("drafts_generated", {}, user_id=uid)
 
     if notify:
         for uid in processed_user_ids:

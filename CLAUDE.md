@@ -37,7 +37,7 @@ A multi-tenant GitHub account analytics/growth SaaS, growing into a draft-and-ap
 - SSR in `page.tsx` (route groups `(dashboard)` / `(auth)`); `"use client"` in components; no `loading.tsx`. Root `AppShell` = sidebar+header on all pages incl. sign-in; mobile drawer `<md`.
 - Overview SSR seeds `repos.all` only — card metrics load client-side with `isPending` skeletons.
 - Shared UI: `PageHeader`, `QueryState`, `InboxItemCard`, `DismissIconButton`, `useRepoNameById`, `job-toasts`, `strip-llm-noise`.
-- Live updates: one `EventSource` via `useLiveEvents` (incl. `stage_completed` → `runs.stages(id)`); TanStack Query invalidate/setQueryData — no Redis.
+- Live updates: one `EventSource` via `useLiveEvents` (incl. `stage_completed` → `runs.stages(id)`); TanStack Query invalidate/setQueryData — no Redis. On-demand jobs always SSE-complete for the requester; `job-toasts` have a 3m safety timeout.
 - Body: `text-gray-700 dark:text-white`; soft vertical gradient + edge-masked grid dots; `overflow-x-hidden` / wrap tables (no page x-scroll).
 - Icons: `lucide-react` + `semanticColor` / feature accents. BFF Route Handlers — browser never holds API key.
 

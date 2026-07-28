@@ -74,7 +74,7 @@ Every endpoint requires `Authorization: Bearer <API_KEY>` except the health chec
 
 The dashboard *shell* (sidebar + header, mobile drawer) mounts from the root layout on every route including `/sign-in`. Page chrome paints immediately; data slots use pulse skeletons (no `loading.tsx`). Server Components prefetch in parallel (`Promise.all` where needed) into TanStack Query's `HydrationBoundary`. Overview SSR seeds the repo list only — per-repo metric cards fill client-side. Shared helpers (`PageHeader`, `QueryState`, inbox cards) keep pending/error/empty consistent.
 
-Every open tab keeps **one** `/api/events` SSE (`useLiveEvents`). CRUD, dismissals, run/stage progress, drafts, and demo assets invalidate the right query keys (including `runs.stages(runId)` on `stage_completed`) so current page, other tabs, and back-navigation stay fresh without a full refresh. Long jobs use spinning Sonner `job-toasts` until the matching SSE event. No Redis — cache is TanStack Query + SSE.
+Every open tab keeps **one** `/api/events` SSE (`useLiveEvents`). CRUD, dismissals, run/stage progress, drafts, and demo assets invalidate the right query keys (including `runs.stages(runId)` on `stage_completed`) so current page, other tabs, and back-navigation stay fresh without a full refresh. Long jobs use spinning Sonner `job-toasts` until the matching SSE event (on-demand pipelines always publish completion for the requester even if every repo was skipped; toasts also time out after 3 minutes). No Redis — cache is TanStack Query + SSE.
 
 The browser never holds the backend API key: Route Handlers under `frontend/app/api/**` proxy via `lib/api.ts` (same client SSR uses).
 

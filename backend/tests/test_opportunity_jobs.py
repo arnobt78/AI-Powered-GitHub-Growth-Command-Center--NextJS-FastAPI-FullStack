@@ -58,5 +58,6 @@ def test_skips_repos_for_user_with_undecryptable_token(mock_publish, seed_user):
     run_opportunities_pipeline_for_all_repos(db, user_id=seed_user)
 
     assert db.query(Opportunity).count() == 0
-    mock_publish.assert_not_called()
+    # On-demand still publishes so the UI kickoff toast closes (no repos ran).
+    mock_publish.assert_any_call("opportunities_generated", {}, user_id=seed_user)
     db.close()
