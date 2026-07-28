@@ -12,9 +12,22 @@ const baseOpportunity = {
 };
 
 function mockHooks(opportunities: unknown[]) {
-  vi.spyOn(useOpportunitiesModule, "useOpportunities").mockReturnValue({ data: opportunities } as ReturnType<typeof useOpportunitiesModule.useOpportunities>);
-  vi.spyOn(useOpportunitiesModule, "useDismissOpportunity").mockReturnValue({ mutate: vi.fn(), isPending: false } as unknown as ReturnType<typeof useOpportunitiesModule.useDismissOpportunity>);
-  vi.spyOn(useReposModule, "useRepos").mockReturnValue({ data: [{ id: 10, owner: "octocat", name: "hello-world" }] } as unknown as ReturnType<typeof useReposModule.useRepos>);
+  vi.spyOn(useOpportunitiesModule, "useOpportunities").mockReturnValue({
+    data: opportunities,
+    isPending: false,
+    isError: false,
+  } as ReturnType<typeof useOpportunitiesModule.useOpportunities>);
+  vi.spyOn(useOpportunitiesModule, "useDismissOpportunity").mockReturnValue({
+    mutate: vi.fn(),
+    isPending: false,
+  } as unknown as ReturnType<typeof useOpportunitiesModule.useDismissOpportunity>);
+  vi.spyOn(useOpportunitiesModule, "useTriggerOpportunitiesRun").mockReturnValue({
+    mutate: vi.fn(),
+    isPending: false,
+  } as unknown as ReturnType<typeof useOpportunitiesModule.useTriggerOpportunitiesRun>);
+  vi.spyOn(useReposModule, "useRepos").mockReturnValue({
+    data: [{ id: 10, owner: "octocat", name: "hello-world" }],
+  } as unknown as ReturnType<typeof useReposModule.useRepos>);
 }
 
 describe("OpportunitiesClient", () => {
@@ -36,14 +49,28 @@ describe("OpportunitiesClient", () => {
     const mutate = vi.fn();
     vi.spyOn(useOpportunitiesModule, "useOpportunities").mockReturnValue({
       data: [{ ...baseOpportunity, source: "hacker_news", title: "Show HN: hello-world", url: "https://example.com/1" }],
+      isPending: false,
+      isError: false,
     } as ReturnType<typeof useOpportunitiesModule.useOpportunities>);
-    vi.spyOn(useOpportunitiesModule, "useDismissOpportunity").mockReturnValue({ mutate, isPending: false } as unknown as ReturnType<typeof useOpportunitiesModule.useDismissOpportunity>);
-    vi.spyOn(useReposModule, "useRepos").mockReturnValue({ data: [{ id: 10, owner: "octocat", name: "hello-world" }] } as unknown as ReturnType<typeof useReposModule.useRepos>);
+    vi.spyOn(useOpportunitiesModule, "useDismissOpportunity").mockReturnValue({
+      mutate,
+      isPending: false,
+    } as unknown as ReturnType<typeof useOpportunitiesModule.useDismissOpportunity>);
+    vi.spyOn(useOpportunitiesModule, "useTriggerOpportunitiesRun").mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+    } as unknown as ReturnType<typeof useOpportunitiesModule.useTriggerOpportunitiesRun>);
+    vi.spyOn(useReposModule, "useRepos").mockReturnValue({
+      data: [{ id: 10, owner: "octocat", name: "hello-world" }],
+    } as unknown as ReturnType<typeof useReposModule.useRepos>);
 
     render(<OpportunitiesClient />);
     fireEvent.click(screen.getByRole("button", { name: /dismiss/i }));
 
-    expect(mutate).toHaveBeenCalledWith({ id: 1, dismissed: true }, expect.objectContaining({ onError: expect.any(Function) }));
+    expect(mutate).toHaveBeenCalledWith(
+      { id: 1, dismissed: true },
+      expect.objectContaining({ onError: expect.any(Function) }),
+    );
   });
 
   it("does not render dismissed opportunities", () => {

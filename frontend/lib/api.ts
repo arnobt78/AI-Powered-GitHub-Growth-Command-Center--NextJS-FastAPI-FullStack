@@ -67,6 +67,8 @@ export const api = {
   triggerRun: () => backendFetch<{ status: string }>("/runs", { method: "POST" }),
   listRunStages: (id: number) => backendFetch<StageRun[]>(`/runs/${id}/stages`),
   triggerContentRun: () => backendFetch<{ status: string }>("/runs/content", { method: "POST" }),
+  triggerOpportunitiesRun: () =>
+    backendFetch<{ status: string }>("/runs/opportunities", { method: "POST" }),
 
   providerStatus: () => backendFetch<ProviderStatus[]>("/providers/status"),
 

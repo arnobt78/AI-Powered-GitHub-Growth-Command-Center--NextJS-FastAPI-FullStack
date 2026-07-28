@@ -8,6 +8,10 @@
  * stay fresh across tabs without `router.refresh()` or full reloads.
  *
  * Keep EVENT_QUERY_MAP in parity with backend `broadcaster.publish(...)` call sites.
+ *
+ * WHY no custom onerror reconnect: the browser EventSource API already
+ * reconnects automatically when the BFF/backend drops the stream (e.g.
+ * uvicorn --reload). We only close on unmount / sign-out.
  */
 
 "use client";
@@ -15,6 +19,7 @@
 import { useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useQueryClient, type QueryKey } from "@tanstack/react-query";
+import { finishJobToast } from "@/lib/job-toasts";
 import { queryKeys } from "@/lib/query-keys";
 
 const EVENT_QUERY_MAP: Record<string, QueryKey[]> = {
@@ -48,7 +53,67 @@ const EVENT_QUERY_MAP: Record<string, QueryKey[]> = {
   // recommendation_updated above).
   demo_asset_updated: [queryKeys.repos.all],
   user_updated: [queryKeys.users.me],
+  // PipelineRun rows are committed per-stage inside BackgroundTasks after the
+  // HTTP 202 returns. Invalidating runs.all on the first stage_completed closes
+  // the race where an immediate post-trigger refetch still saw an empty list.
+  stage_completed: [queryKeys.runs.all],
 };
+
+function parsePayload(data: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(data) as unknown;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // non-JSON payloads are treated as empty
+  }
+  return {};
+}
+
+function finishToastsForEvent(eventType: string, payload: Record<string, unknown>) {
+  if (eventType === "drafts_generated") {
+    finishJobToast("content_run", {
+      ok: true,
+      title: "Drafts ready",
+      description: "New suggestions are in your Drafts inbox.",
+    });
+    return;
+  }
+  if (eventType === "run_completed") {
+    finishJobToast("analytics_run", {
+      ok: true,
+      title: "Analytics run finished",
+      description: "Insights and recommendations are up to date.",
+    });
+    return;
+  }
+  if (eventType === "opportunities_generated") {
+    finishJobToast("opportunities_run", {
+      ok: true,
+      title: "Opportunities scan finished",
+      description: "Check the Opportunities inbox for new mentions.",
+    });
+    return;
+  }
+  if (eventType === "demo_asset_updated") {
+    const status = payload.status;
+    if (status === "ready") {
+      finishJobToast("demo_asset", {
+        ok: true,
+        title: "Demo video ready",
+        description: "Open the repo page to play or download it.",
+      });
+    } else if (status === "failed") {
+      finishJobToast("demo_asset", {
+        ok: false,
+        title: "Demo generation failed",
+        description: "Check the demo assets section for details.",
+      });
+    }
+    // "generating" / "expired" — leave loading toast alone or ignore
+  }
+}
 
 export function useLiveEvents() {
   const queryClient = useQueryClient();
@@ -66,6 +131,16 @@ export function useLiveEvents() {
       for (const key of keysToInvalidate) {
         queryClient.invalidateQueries({ queryKey: key });
       }
+      const payload = parsePayload(String(event.data ?? "{}"));
+      // stage_completed carries run_id — also refresh that run's stages list so
+      // expanded RunRows update without a second EventSource connection.
+      if (event.type === "stage_completed") {
+        const runId = payload.run_id;
+        if (typeof runId === "number") {
+          queryClient.invalidateQueries({ queryKey: queryKeys.runs.stages(runId) });
+        }
+      }
+      finishToastsForEvent(event.type, payload);
     };
 
     for (const eventType of Object.keys(EVENT_QUERY_MAP)) {

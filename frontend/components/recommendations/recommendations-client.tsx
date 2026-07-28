@@ -1,27 +1,22 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, Filter, Lightbulb, Tag, X } from "lucide-react";
 import { useMemo, useState } from "react";
+import { CheckCircle2, Filter, Lightbulb, Tag } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { DismissIconButton } from "@/components/ui/dismiss-icon-button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { SectionHeading } from "@/components/ui/section-heading";
+import { InboxItemCard } from "@/components/ui/inbox-item-card";
+import { PageHeader } from "@/components/ui/page-header";
+import { QueryState } from "@/components/ui/query-state";
 import { useDismissRecommendation, useRecommendations } from "@/hooks/use-recommendations";
-import { useRepos } from "@/hooks/use-repos";
-import { staggerDelay } from "@/lib/stagger";
+import { useRepoNameById } from "@/hooks/use-repo-name-by-id";
 
 export function RecommendationsClient() {
-  const { data: recommendations, isError } = useRecommendations();
-  const { data: repos } = useRepos();
+  const { data: recommendations, isPending, isError } = useRecommendations();
+  const repoNameById = useRepoNameById();
   const dismiss = useDismissRecommendation();
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
-
-  const repoNameById = useMemo(() => {
-    const map = new Map<number, string>();
-    repos?.forEach((r) => map.set(r.id, `${r.owner}/${r.name}`));
-    return map;
-  }, [repos]);
 
   const categories = useMemo(
     () => Array.from(new Set(recommendations?.map((r) => r.category) ?? [])),
@@ -34,12 +29,21 @@ export function RecommendationsClient() {
 
   return (
     <div className="space-y-6">
-      <SectionHeading icon={Lightbulb} title="Recommendations inbox" subtitle="Fact-checked suggestions across every tracked repo" iconColor="text-amber-500" />
+      <PageHeader
+        icon={Lightbulb}
+        title="Recommendations inbox"
+        subtitle="Fact-checked suggestions across every tracked repo"
+        iconColor="text-amber-500"
+      />
 
       {categories.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           <Filter className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-          <Button variant={categoryFilter === null ? "default" : "outline"} size="sm" onClick={() => setCategoryFilter(null)}>
+          <Button
+            variant={categoryFilter === null ? "default" : "outline"}
+            size="sm"
+            onClick={() => setCategoryFilter(null)}
+          >
             <Tag className="h-3.5 w-3.5" aria-hidden="true" />
             All
           </Button>
@@ -57,47 +61,51 @@ export function RecommendationsClient() {
         </div>
       )}
 
-      {isError && !recommendations ? (
-        // Gated on !recommendations (not bare isError) so a background-refetch
-        // failure doesn't discard already-visible data for an error block.
-        <EmptyState icon={AlertTriangle} title="Couldn't load recommendations" description="Please try refreshing the page." />
-      ) : visible && visible.length === 0 ? (
-        <EmptyState icon={CheckCircle2} title="Inbox zero" description="No open recommendations right now." />
-      ) : (
-        <div className="space-y-2">
-          {visible?.map((rec, index) => (
-            // Staggered mount (see lib/stagger.ts); motion-reduce:animate-none
-            // opts out for prefers-reduced-motion users.
-            <Card
-              key={rec.id}
-              className="animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-backwards motion-reduce:animate-none"
-              style={staggerDelay(index)}
-            >
-              <CardContent className="flex items-start justify-between gap-4 py-4">
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground">{repoNameById.get(rec.repo_id) ?? `repo #${rec.repo_id}`}</p>
-                  <p className="font-medium">{rec.title}</p>
-                  <p className="text-sm text-muted-foreground">{rec.body}</p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Dismiss recommendation"
-                  onClick={() =>
-                    dismiss.mutate(
-                      { id: rec.id, dismissed: true },
-                      { onError: () => toast.error("Could not dismiss recommendation", { description: "Please try again." }) },
-                    )
-                  }
-                  disabled={dismiss.isPending}
-                >
-                  <X className="h-4 w-4 text-red-500" aria-hidden="true" />
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+      <QueryState
+        isPending={isPending}
+        isError={isError}
+        hasData={recommendations !== undefined}
+        errorTitle="Couldn't load recommendations"
+      >
+        {visible && visible.length === 0 ? (
+          <EmptyState
+            icon={CheckCircle2}
+            iconColor="text-emerald-500"
+            title="Inbox zero"
+            description="No open recommendations right now."
+          />
+        ) : (
+          <div className="space-y-2">
+            {visible?.map((rec, index) => (
+              <InboxItemCard
+                key={rec.id}
+                index={index}
+                meta={repoNameById.get(rec.repo_id) ?? `repo #${rec.repo_id}`}
+                action={
+                  <DismissIconButton
+                    label="Dismiss recommendation"
+                    disabled={dismiss.isPending}
+                    onClick={() =>
+                      dismiss.mutate(
+                        { id: rec.id, dismissed: true },
+                        {
+                          onError: () =>
+                            toast.error("Could not dismiss recommendation", {
+                              description: "Please try again.",
+                            }),
+                        },
+                      )
+                    }
+                  />
+                }
+              >
+                <p className="font-medium text-foreground">{rec.title}</p>
+                <p className="text-sm text-muted-foreground">{rec.body}</p>
+              </InboxItemCard>
+            ))}
+          </div>
+        )}
+      </QueryState>
     </div>
   );
 }

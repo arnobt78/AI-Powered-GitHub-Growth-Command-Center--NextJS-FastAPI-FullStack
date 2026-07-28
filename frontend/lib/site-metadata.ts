@@ -89,13 +89,14 @@ export const siteMetadata: Metadata = {
     title: SITE_TITLE_SHORT,
     description: SITE_DESCRIPTION,
     url: "/",
-    // Dedicated ~1200×630 OG image not added yet — omit until /public/og.png exists.
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: SITE_TITLE_SHORT }],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: SITE_TITLE_SHORT,
     description: SITE_DESCRIPTION,
     creator: "@arnobt78",
+    images: ["/og.png"],
   },
   alternates: {
     canonical: "/",

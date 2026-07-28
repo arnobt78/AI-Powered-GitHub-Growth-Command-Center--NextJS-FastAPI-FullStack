@@ -1,15 +1,14 @@
 /**
- * Primary app navigation — persistent across client navigations (layout).
+ * Primary app navigation — desktop sidebar or mobile drawer content.
  *
- * Educational walkthrough: uses Next.js `<Link>` (not buttons) so Cmd/Ctrl-click
- * and prefetch work. Semantic icon colors match the feature each item represents.
+ * Educational walkthrough: uses Next.js `<Link>` so Cmd/Ctrl-click and
+ * prefetch work. Semantic icon colors match each feature's SectionHeading.
  */
 
 "use client";
 
 import { Bell, History, Inbox, LayoutDashboard, LogOut, Radar, Settings } from "lucide-react";
-import { signOut } from "next-auth/react";
-import { useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { toast } from "sonner";
@@ -22,31 +21,38 @@ const NAV_ITEMS = [
   { href: "/drafts", label: "Drafts", icon: Inbox, color: "text-emerald-500" },
   { href: "/runs", label: "Pipeline Runs", icon: History, color: "text-violet-500" },
   { href: "/opportunities", label: "Opportunities", icon: Radar, color: "text-rose-500" },
-  { href: "/settings", label: "Settings", icon: Settings, color: "text-slate-500" },
+  // muted-foreground keeps Settings neutral vs feature-accent nav items
+  { href: "/settings", label: "Settings", icon: Settings, color: "text-muted-foreground" },
 ];
 
-// Fires the goodbye toast before signOut() navigates away — the redirect to
-// /sign-in unmounts this component immediately after, so the toast must be
-// queued first or it never has a chance to render.
 function handleSignOut(name: string | null | undefined) {
-  toast.success(`Goodbye, ${name ?? "there"} 👋`, { description: "Hope to see you again soon — happy coding!" });
+  toast.success(`Goodbye, ${name ?? "there"} 👋`, {
+    description: "Hope to see you again soon — happy coding!",
+  });
   signOut({ callbackUrl: "/sign-in" });
 }
 
-export function NavSidebar() {
+export function NavSidebar({
+  onNavigate,
+  className,
+}: {
+  onNavigate?: () => void;
+  className?: string;
+}) {
   const pathname = usePathname();
   const { data: session } = useSession();
 
   return (
-    <nav className="flex w-56 shrink-0 flex-col gap-1 border-r p-4">
+    <nav className={cn("flex w-56 shrink-0 flex-col gap-1 border-r p-4", className)}>
       {NAV_ITEMS.map(({ href, label, icon: Icon, color }) => {
         const active = pathname === href;
         return (
           <Link
             key={href}
             href={href}
+            onClick={onNavigate}
             className={cn(
-              "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium",
+              "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-gray-700 dark:text-white",
               active ? "bg-muted" : "hover:bg-muted/50",
             )}
           >
@@ -65,7 +71,9 @@ export function NavSidebar() {
             height={28}
             className="rounded-full"
           />
-          <span className="flex-1 truncate text-sm font-medium">{session.user.name}</span>
+          <span className="flex-1 truncate text-sm font-medium text-gray-700 dark:text-white">
+            {session.user.name}
+          </span>
           <button
             type="button"
             onClick={() => handleSignOut(session.user.name)}

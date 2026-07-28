@@ -11,7 +11,7 @@ import { SafeImage } from "@/components/safe-image";
 import { DeleteRepoButton } from "@/components/overview/delete-repo-button";
 import { useRepoSnapshots } from "@/hooks/use-repo-snapshots";
 import { useRepoInsights } from "@/hooks/use-repo-insights";
-import { semanticColor } from "@/lib/semantic-color";
+import { semanticColor, CHART_STROKE } from "@/lib/semantic-color";
 import type { Repo } from "@/lib/api-types";
 
 export function RepoCard({ repo }: { repo: Repo }) {
@@ -55,12 +55,12 @@ export function RepoCard({ repo }: { repo: Repo }) {
           <div className="h-16">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={snapshots}>
-                <Line type="monotone" dataKey="stars" stroke="#0ea5e9" strokeWidth={2} dot={false} isAnimationActive={false} />
+                <Line type="monotone" dataKey="stars" stroke={CHART_STROKE.sky} strokeWidth={2} dot={false} isAnimationActive={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>
         )}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center gap-2 justify-between">
           <StatBadge icon={Star} label="Stars" value={latest?.stars ?? 0} color="text-amber-500" mono />
           <StatBadge icon={GitFork} label="Forks" value={latest?.forks ?? 0} color="text-violet-500" mono />
           <StatBadge icon={Eye} label="Watchers" value={latest?.watchers ?? 0} color="text-emerald-500" mono />

@@ -27,3 +27,17 @@ export function useDismissOpportunity() {
     },
   });
 }
+
+export function useTriggerOpportunitiesRun() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      fetchJson<{ status: string }>("/api/runs/opportunities", { method: "POST" }),
+    onSuccess: () => {
+      // Same 202 race as analytics/content — stage_completed SSE invalidates
+      // runs.all once the PipelineRun row exists; opportunities_generated
+      // refreshes the inbox when the scan finishes.
+      queryClient.invalidateQueries({ queryKey: queryKeys.runs.all });
+    },
+  });
+}

@@ -1,16 +1,21 @@
 "use client";
 
-import { AlertTriangle, Radar, X } from "lucide-react";
-import { useMemo } from "react";
+import { Radar, ScanSearch } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Chip } from "@/components/ui/chip";
+import { DismissIconButton } from "@/components/ui/dismiss-icon-button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { SectionHeading } from "@/components/ui/section-heading";
-import { useDismissOpportunity, useOpportunities } from "@/hooks/use-opportunities";
-import { useRepos } from "@/hooks/use-repos";
-import { staggerDelay } from "@/lib/stagger";
+import { InboxItemCard } from "@/components/ui/inbox-item-card";
+import { PageHeader } from "@/components/ui/page-header";
+import { QueryState } from "@/components/ui/query-state";
+import {
+  useDismissOpportunity,
+  useOpportunities,
+  useTriggerOpportunitiesRun,
+} from "@/hooks/use-opportunities";
+import { useRepoNameById } from "@/hooks/use-repo-name-by-id";
+import { startJobToast } from "@/lib/job-toasts";
 
 const SOURCE_LABELS: Record<string, string> = {
   hacker_news: "Hacker News",
@@ -18,69 +23,91 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 
 export function OpportunitiesClient() {
-  const { data: opportunities, isError } = useOpportunities();
-  const { data: repos } = useRepos();
+  const { data: opportunities, isPending, isError } = useOpportunities();
+  const repoNameById = useRepoNameById();
   const dismiss = useDismissOpportunity();
-
-  const repoNameById = useMemo(() => {
-    const map = new Map<number, string>();
-    repos?.forEach((r) => map.set(r.id, `${r.owner}/${r.name}`));
-    return map;
-  }, [repos]);
+  const triggerScan = useTriggerOpportunitiesRun();
 
   const visible = opportunities?.filter((o) => !o.dismissed);
 
   return (
     <div className="space-y-6">
-      <SectionHeading icon={Radar} title="Opportunities" subtitle="New community mentions of your tracked repos" iconColor="text-rose-500" />
+      <PageHeader
+        icon={Radar}
+        title="Opportunities"
+        subtitle="New community mentions of your tracked repos"
+        iconColor="text-rose-500"
+        action={
+          <Button
+            onClick={() =>
+              triggerScan.mutate(undefined, {
+                onSuccess: () =>
+                  startJobToast(
+                    "opportunities_run",
+                    "Scanning communities…",
+                    "Checking Hacker News and GitHub Discussions for mentions.",
+                  ),
+                onError: () =>
+                  toast.error("Could not start opportunities scan", { description: "Please try again." }),
+              })
+            }
+            disabled={triggerScan.isPending}
+          >
+            <ScanSearch className="h-4 w-4" aria-hidden="true" />
+            {triggerScan.isPending ? "Scanning..." : "Scan now"}
+          </Button>
+        }
+      />
 
-      {isError && !opportunities ? (
-        // Gated on !opportunities (not bare isError) so a background-refetch
-        // failure doesn't discard already-visible data for an error block.
-        <EmptyState icon={AlertTriangle} title="Couldn't load opportunities" description="Please try refreshing the page." />
-      ) : visible && visible.length === 0 ? (
-        <EmptyState icon={Radar} title="No opportunities yet" description="They'll show up here once a mention is found." />
-      ) : (
-        <div className="space-y-2">
-          {visible?.map((opp, index) => (
-            // Staggered mount (see lib/stagger.ts); motion-reduce:animate-none
-            // opts out for prefers-reduced-motion users.
-            <Card
-              key={opp.id}
-              className="animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-backwards motion-reduce:animate-none"
-              style={staggerDelay(index)}
-            >
-              <CardContent className="flex items-start justify-between gap-4 py-4">
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    {repoNameById.get(opp.repo_id) ?? `repo #${opp.repo_id}`}
-                  </p>
-                  <a href={opp.url} target="_blank" rel="noreferrer" className="font-medium hover:underline">
-                    {opp.title}
-                  </a>
-                  <div className="mt-1">
-                    <Chip>{SOURCE_LABELS[opp.source] ?? opp.source}</Chip>
-                  </div>
+      <QueryState
+        isPending={isPending}
+        isError={isError}
+        hasData={opportunities !== undefined}
+        errorTitle="Couldn't load opportunities"
+      >
+        {visible && visible.length === 0 ? (
+          <EmptyState
+            icon={Radar}
+            iconColor="text-rose-500"
+            title="No opportunities yet"
+            description="Click 'Scan now' or wait for the daily schedule to find mentions."
+          />
+        ) : (
+          <div className="space-y-2">
+            {visible?.map((opp, index) => (
+              <InboxItemCard
+                key={opp.id}
+                index={index}
+                meta={repoNameById.get(opp.repo_id) ?? `repo #${opp.repo_id}`}
+                action={
+                  <DismissIconButton
+                    label="Dismiss opportunity"
+                    disabled={dismiss.isPending}
+                    onClick={() =>
+                      dismiss.mutate(
+                        { id: opp.id, dismissed: true },
+                        {
+                          onError: () =>
+                            toast.error("Could not dismiss opportunity", {
+                              description: "Please try again.",
+                            }),
+                        },
+                      )
+                    }
+                  />
+                }
+              >
+                <a href={opp.url} target="_blank" rel="noreferrer" className="font-medium text-foreground hover:underline">
+                  {opp.title}
+                </a>
+                <div className="mt-1">
+                  <Chip>{SOURCE_LABELS[opp.source] ?? opp.source}</Chip>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Dismiss opportunity"
-                  onClick={() =>
-                    dismiss.mutate(
-                      { id: opp.id, dismissed: true },
-                      { onError: () => toast.error("Could not dismiss opportunity", { description: "Please try again." }) },
-                    )
-                  }
-                  disabled={dismiss.isPending}
-                >
-                  <X className="h-4 w-4 text-red-500" aria-hidden="true" />
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+              </InboxItemCard>
+            ))}
+          </div>
+        )}
+      </QueryState>
     </div>
   );
 }

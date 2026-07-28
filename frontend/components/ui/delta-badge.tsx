@@ -1,4 +1,5 @@
 import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
+import { semanticColor } from "@/lib/semantic-color";
 
 export function DeltaBadge({ value, label }: { value: number; label: string }) {
   if (value === 0) {
@@ -14,10 +15,14 @@ export function DeltaBadge({ value, label }: { value: number; label: string }) {
 
   return (
     <span
-      className={`flex items-center gap-1 text-sm ${trending ? "text-emerald-500" : "text-red-500"}`}
+      className={`flex items-center gap-1 text-sm ${trending ? semanticColor("positive") : semanticColor("negative")}`}
       aria-label={`${label}: ${trending ? "up" : "down"} ${Math.abs(value)}`}
     >
-      {trending ? <ArrowUpRight className="h-4 w-4" aria-hidden="true" /> : <ArrowDownRight className="h-4 w-4" aria-hidden="true" />}
+      {trending ? (
+        <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+      ) : (
+        <ArrowDownRight className="h-4 w-4" aria-hidden="true" />
+      )}
       <span className="font-mono tabular-nums">
         {trending ? "+" : ""}
         {value}

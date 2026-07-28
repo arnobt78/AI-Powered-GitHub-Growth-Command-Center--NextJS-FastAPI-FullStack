@@ -1,45 +1,65 @@
 "use client";
 
-import { AlertTriangle, History, Play } from "lucide-react";
+import { History, Play } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { SectionHeading } from "@/components/ui/section-heading";
+import { PageHeader } from "@/components/ui/page-header";
+import { QueryState } from "@/components/ui/query-state";
 import { useRuns, useTriggerRun } from "@/hooks/use-runs";
 import { RunRow } from "@/components/runs/run-row";
+import { startJobToast } from "@/lib/job-toasts";
 
 export function RunsClient() {
-  const { data: runs, isError } = useRuns();
+  const { data: runs, isPending, isError } = useRuns();
   const triggerRun = useTriggerRun();
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <SectionHeading icon={History} title="Pipeline runs" subtitle="Execution history, per-stage status" iconColor="text-violet-500" />
-        <Button
-          onClick={() =>
-            triggerRun.mutate(undefined, {
-              onSuccess: () => toast.success("Pipeline run triggered", { description: "This may take a few minutes." }),
-              onError: () => toast.error("Could not trigger a run", { description: "Please try again." }),
-            })
-          }
-          disabled={triggerRun.isPending}
-        >
-          <Play className="h-4 w-4" aria-hidden="true" />
-          {triggerRun.isPending ? "Running..." : "Run now"}
-        </Button>
-      </div>
-      {isError && !runs ? (
-        // Gated on !runs (not bare isError) so a background-refetch failure
-        // doesn't discard already-visible data for an error block.
-        <EmptyState icon={AlertTriangle} title="Couldn't load runs" description="Please try refreshing the page." />
-      ) : runs && runs.length === 0 ? (
-        <EmptyState icon={History} title="No runs yet" description="Trigger one manually or wait for the daily schedule." />
-      ) : (
-        <div className="space-y-2">
-          {runs?.map((run, index) => <RunRow key={run.id} run={run} index={index} />)}
-        </div>
-      )}
+      <PageHeader
+        icon={History}
+        title="Pipeline runs"
+        subtitle="Execution history, per-stage status"
+        iconColor="text-violet-500"
+        action={
+          <Button
+            onClick={() =>
+              triggerRun.mutate(undefined, {
+                onSuccess: () =>
+                  startJobToast(
+                    "analytics_run",
+                    "Running analytics…",
+                    "This may take a few minutes. Stages will appear as they finish.",
+                  ),
+                onError: () => toast.error("Could not trigger a run", { description: "Please try again." }),
+              })
+            }
+            disabled={triggerRun.isPending}
+          >
+            <Play className="h-4 w-4" aria-hidden="true" />
+            {triggerRun.isPending ? "Running..." : "Run now"}
+          </Button>
+        }
+      />
+      <QueryState
+        isPending={isPending}
+        isError={isError}
+        hasData={runs !== undefined}
+        errorTitle="Couldn't load runs"
+      >
+        {runs && runs.length === 0 ? (
+          <EmptyState
+            icon={History}
+            iconColor="text-violet-500"
+            title="No runs yet"
+            description="Trigger one manually or wait for the daily schedule."
+          />
+        ) : (
+          <div className="space-y-2">
+            {runs?.map((run, index) => <RunRow key={run.id} run={run} index={index} />)}
+          </div>
+        )}
+      </QueryState>
     </div>
   );
 }

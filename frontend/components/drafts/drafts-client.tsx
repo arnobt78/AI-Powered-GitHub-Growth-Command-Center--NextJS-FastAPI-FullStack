@@ -1,22 +1,19 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, Inbox, Sparkles, X } from "lucide-react";
-import { useMemo } from "react";
+import { CheckCircle2, Copy, Inbox, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { SectionHeading } from "@/components/ui/section-heading";
+import { InboxItemCard } from "@/components/ui/inbox-item-card";
+import { PageHeader } from "@/components/ui/page-header";
+import { QueryState } from "@/components/ui/query-state";
 import { DraftContent } from "@/components/drafts/draft-content";
 import { useDrafts, useReviewDraft, useTriggerContentRun } from "@/hooks/use-drafts";
-import { useRepos } from "@/hooks/use-repos";
-import { staggerDelay } from "@/lib/stagger";
+import { useRepoNameById } from "@/hooks/use-repo-name-by-id";
+import { suggestedTextForCopy } from "@/lib/draft-copy";
+import { startJobToast } from "@/lib/job-toasts";
 import type { DraftKind } from "@/types/drafts";
 
-// `satisfies` gives compile-time exhaustiveness against DraftKind (a new kind
-// added to the backend without a label here fails the build) while keeping
-// the variable's type as Record<string, string> so draft.kind (a plain
-// string from the generated OpenAPI type) can still index it directly.
 const DRAFT_KIND_LABELS: Record<string, string> = {
   readme_suggestion: "README suggestion",
   missing_doc_suggestion: "Missing doc",
@@ -27,110 +24,164 @@ const DRAFT_KIND_LABELS: Record<string, string> = {
   discussion_reply: "Discussion reply",
 } satisfies Record<DraftKind, string>;
 
+const REPLY_KINDS = new Set(["issue_reply", "discussion_reply"]);
+
 export function DraftsClient() {
-  const { data: drafts, isError } = useDrafts();
-  const { data: repos } = useRepos();
+  const { data: drafts, isPending, isError } = useDrafts();
+  const repoNameById = useRepoNameById();
   const review = useReviewDraft();
   const triggerContentRun = useTriggerContentRun();
 
-  const repoNameById = useMemo(() => {
-    const map = new Map<number, string>();
-    repos?.forEach((r) => map.set(r.id, `${r.owner}/${r.name}`));
-    return map;
-  }, [repos]);
-
   const pending = drafts?.filter((d) => d.status === "pending");
+  const hasReviewed = Boolean(drafts?.some((d) => d.status !== "pending"));
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <SectionHeading icon={Inbox} title="Drafts" subtitle="Review before anything goes out" iconColor="text-emerald-500" />
-        <Button
-          onClick={() =>
-            triggerContentRun.mutate(undefined, {
-              onSuccess: () => toast.success("Content generation started", { description: "Drafts will appear here shortly." }),
-              onError: () => toast.error("Could not start content generation", { description: "Please try again." }),
-            })
-          }
-          disabled={triggerContentRun.isPending}
-        >
-          <Sparkles className="h-4 w-4" aria-hidden="true" />
-          {triggerContentRun.isPending ? "Generating..." : "Generate drafts"}
-        </Button>
-      </div>
+      <PageHeader
+        icon={Inbox}
+        title="Drafts"
+        subtitle="Review before anything goes out"
+        iconColor="text-emerald-500"
+        action={
+          <Button
+            onClick={() =>
+              triggerContentRun.mutate(undefined, {
+                onSuccess: () =>
+                  startJobToast(
+                    "content_run",
+                    "Generating drafts…",
+                    "This may take a minute. We'll notify you when they're ready.",
+                  ),
+                onError: () =>
+                  toast.error("Could not start content generation", { description: "Please try again." }),
+              })
+            }
+            disabled={triggerContentRun.isPending}
+          >
+            <Sparkles className="h-4 w-4" aria-hidden="true" />
+            {triggerContentRun.isPending ? "Generating..." : "Generate drafts"}
+          </Button>
+        }
+      />
 
-      {isError && !drafts ? (
-        // Gated on !drafts (not bare isError) so a background-refetch
-        // failure doesn't discard already-visible data for an error block.
-        <EmptyState icon={AlertTriangle} title="Couldn't load drafts" description="Please try refreshing the page." />
-      ) : pending && pending.length === 0 ? (
-        <EmptyState icon={Inbox} title="No drafts yet" description="Click 'Generate drafts' or wait for the daily schedule." />
-      ) : (
-        <div className="space-y-2">
-          {pending?.map((draft, index) => (
-            // Staggered mount (see lib/stagger.ts); motion-reduce:animate-none
-            // opts out for prefers-reduced-motion users.
-            <Card
-              key={draft.id}
-              className="animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-backwards motion-reduce:animate-none"
-              style={staggerDelay(index)}
-            >
-              <CardContent className="flex items-start justify-between gap-4 py-4">
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    {draft.repo_id !== null ? repoNameById.get(draft.repo_id) ?? `repo #${draft.repo_id}` : "Account-level"}
-                    {" · "}
-                    {DRAFT_KIND_LABELS[draft.kind] ?? draft.kind}
-                    {draft.kind === "release_notes" && ` (${draft.target})`}
-                  </p>
-                  <div className="mt-1">
-                    <DraftContent kind={draft.kind} content={draft.content} />
-                  </div>
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Approve draft"
-                    onClick={() =>
-                      review.mutate(
-                        { id: draft.id, status: "approved" },
-                        {
-                          onSuccess: (updated) => {
-                            if (updated.status === "posted") {
-                              toast.success("Reply posted to GitHub", { description: "Your approved reply is now live." });
-                            } else if (updated.status === "failed") {
-                              toast.error("Could not post reply", { description: updated.error_message ?? "Unknown error." });
+      <QueryState
+        isPending={isPending}
+        isError={isError}
+        hasData={drafts !== undefined}
+        errorTitle="Couldn't load drafts"
+      >
+        {pending && pending.length === 0 ? (
+          <EmptyState
+            icon={hasReviewed ? CheckCircle2 : Inbox}
+            iconColor={hasReviewed ? "text-emerald-500" : "text-emerald-500"}
+            title={hasReviewed ? "Inbox clear" : "No drafts yet"}
+            description={
+              hasReviewed
+                ? "All drafts have been reviewed. Generate again anytime for fresh suggestions."
+                : "Click 'Generate drafts' or wait for the daily schedule."
+            }
+          />
+        ) : (
+          <div className="space-y-2">
+            {pending?.map((draft, index) => {
+              const copyText = suggestedTextForCopy(draft.kind, draft.content);
+              return (
+                <InboxItemCard
+                  key={draft.id}
+                  index={index}
+                  meta={
+                    <>
+                      {draft.repo_id !== null
+                        ? repoNameById.get(draft.repo_id) ?? `repo #${draft.repo_id}`
+                        : "Account-level"}
+                      {" · "}
+                      {DRAFT_KIND_LABELS[draft.kind] ?? draft.kind}
+                      {draft.kind === "release_notes" && ` (${draft.target})`}
+                    </>
+                  }
+                  action={
+                    <>
+                      {copyText ? (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Copy suggested text"
+                          onClick={async () => {
+                            try {
+                              await navigator.clipboard.writeText(copyText);
+                              toast.success("Copied to clipboard");
+                            } catch {
+                              toast.error("Could not copy", { description: "Clipboard permission denied." });
                             }
-                          },
-                          onError: () => toast.error("Could not approve draft", { description: "Please try again." }),
-                        },
-                      )
-                    }
-                    disabled={review.isPending}
-                  >
-                    <CheckCircle2 className="h-4 w-4 text-emerald-500" aria-hidden="true" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Reject draft"
-                    onClick={() =>
-                      review.mutate(
-                        { id: draft.id, status: "rejected" },
-                        { onError: () => toast.error("Could not reject draft", { description: "Please try again." }) },
-                      )
-                    }
-                    disabled={review.isPending}
-                  >
-                    <X className="h-4 w-4 text-red-500" aria-hidden="true" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+                          }}
+                        >
+                          <Copy className="h-4 w-4 text-sky-500" aria-hidden="true" />
+                        </Button>
+                      ) : null}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Approve draft"
+                        onClick={() =>
+                          review.mutate(
+                            { id: draft.id, status: "approved" },
+                            {
+                              onSuccess: (updated) => {
+                                if (updated.status === "posted") {
+                                  toast.success("Reply posted to GitHub", {
+                                    description: "Your approved reply is now live.",
+                                  });
+                                } else if (updated.status === "failed") {
+                                  toast.error("Could not post reply", {
+                                    description: updated.error_message ?? "Unknown error.",
+                                  });
+                                } else if (!REPLY_KINDS.has(draft.kind)) {
+                                  toast.success("Draft approved", {
+                                    description:
+                                      "Removed from the pending inbox. Use Copy if you still need the text.",
+                                  });
+                                }
+                              },
+                              onError: () =>
+                                toast.error("Could not approve draft", { description: "Please try again." }),
+                            },
+                          )
+                        }
+                        disabled={review.isPending}
+                      >
+                        <CheckCircle2 className="h-4 w-4 text-emerald-500" aria-hidden="true" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Reject draft"
+                        onClick={() =>
+                          review.mutate(
+                            { id: draft.id, status: "rejected" },
+                            {
+                              onSuccess: () =>
+                                toast.success("Draft rejected", {
+                                  description: "Removed from the pending inbox.",
+                                }),
+                              onError: () =>
+                                toast.error("Could not reject draft", { description: "Please try again." }),
+                            },
+                          )
+                        }
+                        disabled={review.isPending}
+                      >
+                        <X className="h-4 w-4 text-red-500" aria-hidden="true" />
+                      </Button>
+                    </>
+                  }
+                >
+                  <DraftContent kind={draft.kind} content={draft.content} />
+                </InboxItemCard>
+              );
+            })}
+          </div>
+        )}
+      </QueryState>
     </div>
   );
 }

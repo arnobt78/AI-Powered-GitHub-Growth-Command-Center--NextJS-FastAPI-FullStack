@@ -7,10 +7,11 @@ import type {
   TopicSuggestionContent,
 } from "@/types/drafts";
 import { Chip } from "@/components/ui/chip";
+import { stripLlmNoise, stripLlmNoiseDeep } from "@/lib/strip-llm-noise";
 
 function Reason({ reason }: { reason: string | null }) {
   if (!reason) return null;
-  return <p className="mt-2 text-xs text-muted-foreground">{reason}</p>;
+  return <p className="mt-2 text-xs text-muted-foreground">{stripLlmNoise(reason)}</p>;
 }
 
 // Shared by every kind's "Current"/"Suggested" field pair below instead of
@@ -43,110 +44,113 @@ function isSeoSuggestion(c: unknown): c is SeoSuggestionContent {
 }
 
 export function DraftContent({ kind, content }: { kind: DraftKind | string; content: unknown }) {
-  if (kind === "readme_suggestion" && isReadmeSuggestion(content)) {
+  // Display-only sanitization — stored JSON stays raw for debugging.
+  const cleaned = stripLlmNoiseDeep(content);
+
+  if (kind === "readme_suggestion" && isReadmeSuggestion(cleaned)) {
     return (
       <div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <FieldLabel variant="current">Current</FieldLabel>
-            <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-md bg-muted/50 p-2 text-xs">
-              {content.current ?? "(no README yet)"}
+            <pre className="max-h-48 overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-muted/50 p-2 text-xs">
+              {cleaned.current ?? "(no README yet)"}
             </pre>
           </div>
           <div>
             <FieldLabel variant="suggested">Suggested</FieldLabel>
-            <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-md bg-muted/50 p-2 text-xs">{content.suggested}</pre>
+            <pre className="max-h-48 overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-muted/50 p-2 text-xs">{cleaned.suggested}</pre>
           </div>
         </div>
-        <Reason reason={content.reason} />
+        <Reason reason={cleaned.reason} />
       </div>
     );
   }
 
-  if (kind === "missing_doc_suggestion" && isMissingDocSuggestion(content)) {
+  if (kind === "missing_doc_suggestion" && isMissingDocSuggestion(cleaned)) {
     return (
       <div>
-        <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-md bg-muted/50 p-2 text-xs">{content.suggested}</pre>
-        <Reason reason={content.reason} />
+        <pre className="max-h-48 overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-muted/50 p-2 text-xs">{cleaned.suggested}</pre>
+        <Reason reason={cleaned.reason} />
       </div>
     );
   }
 
-  if (kind === "release_notes" && isMissingDocSuggestion(content)) {
+  if (kind === "release_notes" && isMissingDocSuggestion(cleaned)) {
     return (
       <div>
-        <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-md bg-muted/50 p-2 text-xs">{content.suggested}</pre>
-        <Reason reason={content.reason} />
+        <pre className="max-h-48 overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-muted/50 p-2 text-xs">{cleaned.suggested}</pre>
+        <Reason reason={cleaned.reason} />
       </div>
     );
   }
 
-  if (kind === "issue_reply" && isMissingDocSuggestion(content)) {
+  if (kind === "issue_reply" && isMissingDocSuggestion(cleaned)) {
     return (
       <div>
-        <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-md bg-muted/50 p-2 text-xs">{content.suggested}</pre>
-        <Reason reason={content.reason} />
+        <pre className="max-h-48 overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-muted/50 p-2 text-xs">{cleaned.suggested}</pre>
+        <Reason reason={cleaned.reason} />
       </div>
     );
   }
 
-  if (kind === "discussion_reply" && isMissingDocSuggestion(content)) {
+  if (kind === "discussion_reply" && isMissingDocSuggestion(cleaned)) {
     return (
       <div>
-        <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-md bg-muted/50 p-2 text-xs">{content.suggested}</pre>
-        <Reason reason={content.reason} />
+        <pre className="max-h-48 overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-muted/50 p-2 text-xs">{cleaned.suggested}</pre>
+        <Reason reason={cleaned.reason} />
       </div>
     );
   }
 
-  if (kind === "topic_suggestion" && isTopicSuggestion(content)) {
+  if (kind === "topic_suggestion" && isTopicSuggestion(cleaned)) {
     return (
       <div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <FieldLabel variant="current">Current</FieldLabel>
             <div className="flex flex-wrap gap-1.5">
-              {content.current.length > 0
-                ? content.current.map((topic, i) => <Chip key={`${topic}-${i}`}>{topic}</Chip>)
+              {cleaned.current.length > 0
+                ? cleaned.current.map((topic, i) => <Chip key={`${topic}-${i}`}>{topic}</Chip>)
                 : <p className="text-xs text-muted-foreground">(no topics yet)</p>}
             </div>
           </div>
           <div>
             <FieldLabel variant="suggested">Suggested</FieldLabel>
             <div className="flex flex-wrap gap-1.5">
-              {content.suggested.map((topic, i) => (
+              {cleaned.suggested.map((topic, i) => (
                 <Chip key={`${topic}-${i}`}>{topic}</Chip>
               ))}
             </div>
           </div>
         </div>
-        <Reason reason={content.reason} />
+        <Reason reason={cleaned.reason} />
       </div>
     );
   }
 
-  if (kind === "seo_suggestion" && isSeoSuggestion(content)) {
+  if (kind === "seo_suggestion" && isSeoSuggestion(cleaned)) {
     return (
       <div className="space-y-1.5 text-sm">
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <FieldLabel variant="current">Current</FieldLabel>
-            <p className="text-sm">{content.current ?? "(no description yet)"}</p>
+            <p className="text-sm">{cleaned.current ?? "(no description yet)"}</p>
           </div>
           <div>
             <FieldLabel variant="suggested">Suggested</FieldLabel>
-            <p className="text-sm">{content.suggested_description}</p>
+            <p className="text-sm">{cleaned.suggested_description}</p>
           </div>
         </div>
         <div className="flex flex-wrap gap-1.5">
-          {content.keywords.map((keyword, i) => (
+          {cleaned.keywords.map((keyword, i) => (
             <Chip key={`${keyword}-${i}`}>{keyword}</Chip>
           ))}
         </div>
-        <Reason reason={content.reason} />
+        <Reason reason={cleaned.reason} />
       </div>
     );
   }
 
-  return <p className="text-sm text-muted-foreground">{JSON.stringify(content)}</p>;
+  return <p className="text-sm text-muted-foreground">{JSON.stringify(cleaned)}</p>;
 }

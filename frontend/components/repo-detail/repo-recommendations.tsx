@@ -1,12 +1,12 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, Lightbulb, X } from "lucide-react";
+import { CheckCircle2, Lightbulb } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { DismissIconButton } from "@/components/ui/dismiss-icon-button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { SectionHeading } from "@/components/ui/section-heading";
-import { Skeleton } from "@/components/ui/skeleton";
+import { InboxItemCard } from "@/components/ui/inbox-item-card";
+import { PageHeader } from "@/components/ui/page-header";
+import { QueryState } from "@/components/ui/query-state";
 import { useDismissRecommendation, useRecommendations } from "@/hooks/use-recommendations";
 
 export function RepoRecommendations({ repoId }: { repoId: number }) {
@@ -17,43 +17,58 @@ export function RepoRecommendations({ repoId }: { repoId: number }) {
 
   return (
     <div className="space-y-3">
-      <SectionHeading icon={Lightbulb} title="Recommendations" subtitle="Fact-checked suggestions for this repo" iconColor="text-amber-500" />
-      {isPending ? (
-        <Skeleton className="h-24 w-full" />
-      ) : isError && !recommendations ? (
-        // Gated on !recommendations (not bare isError) so a background-refetch
-        // failure doesn't discard already-visible data for an error block.
-        <EmptyState icon={AlertTriangle} title="Couldn't load recommendations" description="Please try refreshing the page." />
-      ) : scoped && scoped.length === 0 ? (
-        <EmptyState icon={CheckCircle2} title="All caught up" description="No open recommendations for this repo." />
-      ) : (
-        <div className="space-y-2">
-          {scoped?.map((rec) => (
-            <Card key={rec.id}>
-              <CardContent className="flex items-start justify-between gap-4 py-4">
-                <div>
-                  <p className="font-medium">{rec.title}</p>
-                  <p className="text-sm text-muted-foreground">{rec.body}</p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Dismiss recommendation"
-                  onClick={() =>
-                    dismiss.mutate(
-                      { id: rec.id, dismissed: true },
-                      { onError: () => toast.error("Could not dismiss recommendation", { description: "Please try again." }) },
-                    )
-                  }
-                  disabled={dismiss.isPending}
-                >
-                  <X className="h-4 w-4 text-red-500" aria-hidden="true" />
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+      <PageHeader
+        icon={Lightbulb}
+        title="Recommendations"
+        subtitle="Fact-checked suggestions for this repo"
+        iconColor="text-amber-500"
+      />
+      <QueryState
+        isPending={isPending}
+        isError={isError}
+        hasData={recommendations !== undefined}
+        errorTitle="Couldn't load recommendations"
+        skeletonCount={1}
+        skeletonClassName="h-24 w-full"
+      >
+        {scoped && scoped.length === 0 ? (
+          <EmptyState
+            icon={CheckCircle2}
+            iconColor="text-emerald-500"
+            title="All caught up"
+            description="No open recommendations for this repo."
+          />
+        ) : (
+          <div className="space-y-2">
+            {scoped?.map((rec, index) => (
+              <InboxItemCard
+                key={rec.id}
+                index={index}
+                action={
+                  <DismissIconButton
+                    label="Dismiss recommendation"
+                    disabled={dismiss.isPending}
+                    onClick={() =>
+                      dismiss.mutate(
+                        { id: rec.id, dismissed: true },
+                        {
+                          onError: () =>
+                            toast.error("Could not dismiss recommendation", {
+                              description: "Please try again.",
+                            }),
+                        },
+                      )
+                    }
+                  />
+                }
+              >
+                <p className="font-medium text-foreground">{rec.title}</p>
+                <p className="text-sm text-muted-foreground">{rec.body}</p>
+              </InboxItemCard>
+            ))}
+          </div>
+        )}
+      </QueryState>
     </div>
   );
 }

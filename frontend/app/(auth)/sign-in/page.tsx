@@ -19,18 +19,18 @@ export default async function SignInPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
+    <div className="flex items-center justify-center py-8 sm:py-12">
       <div className="flex w-full max-w-sm flex-col items-center gap-6 rounded-lg border p-8 text-center">
         <Rocket className="h-10 w-10 text-sky-500" aria-hidden="true" />
         <div className="space-y-1">
-          <h1 className="text-lg font-semibold">{SITE_TITLE_SHORT}</h1>
+          <h1 className="text-lg font-semibold text-gray-700 dark:text-white">{SITE_TITLE_SHORT}</h1>
           <p className="text-sm text-muted-foreground">
             Sign in with GitHub to track your repos and get AI-synthesized growth recommendations.
           </p>
         </div>
         <SignInButton />
-        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <GithubIcon className="h-3.5 w-3.5" aria-hidden="true" />
+        <p className="flex flex-wrap items-center justify-center gap-1.5 text-xs text-muted-foreground">
+          <GithubIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           Public-repo read access only — we never touch private repos or write to GitHub.
         </p>
       </div>

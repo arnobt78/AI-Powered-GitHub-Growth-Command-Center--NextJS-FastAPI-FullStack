@@ -15,7 +15,7 @@ export function SectionHeading({
     <div className="flex items-center gap-2">
       <Icon className={`h-5 w-5 ${iconColor}`} aria-hidden="true" />
       <div>
-        <h2 className="text-lg font-semibold leading-tight">{title}</h2>
+        <h2 className="text-lg font-semibold leading-tight break-words text-gray-700 dark:text-white">{title}</h2>
         {subtitle ? <p className="text-sm text-muted-foreground">{subtitle}</p> : null}
       </div>
     </div>

@@ -33,11 +33,13 @@ A multi-tenant GitHub account analytics/growth SaaS, growing into a draft-and-ap
 
 **Frontend (`frontend/` — Next.js App Router, TypeScript):**
 
-- Engineering standards: [`docs/PROJECT_IDEA.md`](docs/PROJECT_IDEA.md). SEO metadata: [`frontend/lib/site-metadata.ts`](frontend/lib/site-metadata.ts) (`NEXT_PUBLIC_SITE_URL` after deploy).
-- SSR prefetch in `page.tsx`; `"use client"` only when needed; no `loading.tsx`; shell instant + data-slot skeletons.
-- Independent prefetches: `Promise.all`. Never `void` + `dehydrate`.
-- Icons: `lucide-react` + semantic color. Structure: `lib/`, `hooks/`, `providers/`, `types/` (OpenAPI), `components/ui/`.
-- Browser never holds backend API key — Route Handlers BFF. CRUD: TanStack Query + SSE invalidation (no full refresh).
+- Engineering standards: [`docs/PROJECT_IDEA.md`](docs/PROJECT_IDEA.md). SEO: [`frontend/lib/site-metadata.ts`](frontend/lib/site-metadata.ts) (+ `/public/og.png`).
+- SSR in `page.tsx` (route groups `(dashboard)` / `(auth)`); `"use client"` in components; no `loading.tsx`. Root `AppShell` = sidebar+header on all pages incl. sign-in; mobile drawer `<md`.
+- Overview SSR seeds `repos.all` only — card metrics load client-side with `isPending` skeletons.
+- Shared UI: `PageHeader`, `QueryState`, `InboxItemCard`, `DismissIconButton`, `useRepoNameById`, `job-toasts`, `strip-llm-noise`.
+- Live updates: one `EventSource` via `useLiveEvents` (incl. `stage_completed` → `runs.stages(id)`); TanStack Query invalidate/setQueryData — no Redis.
+- Body: `text-gray-700 dark:text-white`; soft vertical gradient + edge-masked grid dots; `overflow-x-hidden` / wrap tables (no page x-scroll).
+- Icons: `lucide-react` + `semanticColor` / feature accents. BFF Route Handlers — browser never holds API key.
 
 **Deployment:**
 

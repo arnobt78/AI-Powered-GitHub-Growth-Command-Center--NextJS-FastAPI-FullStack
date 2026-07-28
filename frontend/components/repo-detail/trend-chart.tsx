@@ -5,6 +5,7 @@ import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "rec
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRepoSnapshots } from "@/hooks/use-repo-snapshots";
+import { CHART_STROKE } from "@/lib/semantic-color";
 
 export function TrendChart({ repoId }: { repoId: number }) {
   const { data: snapshots, isPending, isError } = useRepoSnapshots(repoId);
@@ -28,9 +29,9 @@ export function TrendChart({ repoId }: { repoId: number }) {
           <XAxis dataKey="date" tick={{ fontSize: 12 }} />
           <YAxis tick={{ fontSize: 12 }} />
           <Tooltip />
-          <Line type="monotone" dataKey="stars" stroke="#f59e0b" strokeWidth={2} dot={false} name="Stars" />
-          <Line type="monotone" dataKey="forks" stroke="#8b5cf6" strokeWidth={2} dot={false} name="Forks" />
-          <Line type="monotone" dataKey="views_14d" stroke="#0ea5e9" strokeWidth={2} dot={false} name="Views (14d)" />
+          <Line type="monotone" dataKey="stars" stroke={CHART_STROKE.amber} strokeWidth={2} dot={false} name="Stars" />
+          <Line type="monotone" dataKey="forks" stroke={CHART_STROKE.violet} strokeWidth={2} dot={false} name="Forks" />
+          <Line type="monotone" dataKey="views_14d" stroke={CHART_STROKE.sky} strokeWidth={2} dot={false} name="Views (14d)" />
         </LineChart>
       </ResponsiveContainer>
     </div>

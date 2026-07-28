@@ -10,9 +10,9 @@ import { semanticColor } from "@/lib/semantic-color";
 import { staggerDelay } from "@/lib/stagger";
 
 const STATUS_META = {
-  ok: { icon: CheckCircle2, color: "text-emerald-500", label: "OK" },
-  degraded: { icon: AlertTriangle, color: "text-amber-500", label: "Degraded" },
-  running: { icon: Loader2, color: "text-sky-500", label: "Running" },
+  ok: { icon: CheckCircle2, color: semanticColor("positive"), label: "OK" },
+  degraded: { icon: AlertTriangle, color: semanticColor("warning"), label: "Degraded" },
+  running: { icon: Loader2, color: semanticColor("neutral"), label: "Running" },
 } as const;
 
 const KIND_META = {
@@ -58,7 +58,7 @@ function StageRowLine({ stageRow }: { stageRow: StageRun }) {
     <div className="text-sm">
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-1.5">
-          <StatusIcon className={`h-3.5 w-3.5 ${ok ? "text-emerald-500" : "text-red-500"}`} aria-hidden="true" />
+          <StatusIcon className={`h-3.5 w-3.5 ${ok ? semanticColor("positive") : semanticColor("negative")}`} aria-hidden="true" />
           {stageRow.stage_name}
         </span>
         <span className="flex items-center gap-2 text-muted-foreground">
@@ -66,7 +66,7 @@ function StageRowLine({ stageRow }: { stageRow: StageRun }) {
           <span className={ok ? semanticColor("positive") : semanticColor("negative")}>{stageRow.status}</span>
         </span>
       </div>
-      {stageRow.error && <p className="mt-0.5 text-xs text-red-500">{stageRow.error}</p>}
+      {stageRow.error && <p className={`mt-0.5 text-xs ${semanticColor("negative")}`}>{stageRow.error}</p>}
     </div>
   );
 }

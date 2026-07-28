@@ -143,6 +143,38 @@ describe("useLiveEvents", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.repos.all });
   });
 
+  it("invalidates runs.all when stage_completed arrives (closes 202 vs empty-list race)", () => {
+    const queryClient = new QueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <Harness />
+      </QueryClientProvider>,
+    );
+
+    const source = FakeEventSource.instances[0];
+    source.emit("stage_completed", { run_id: 1, stage_name: "extractor", status: "ok" });
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.runs.all });
+  });
+
+  it("also invalidates that run's stages query on stage_completed", () => {
+    const queryClient = new QueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <Harness />
+      </QueryClientProvider>,
+    );
+
+    const source = FakeEventSource.instances[0];
+    source.emit("stage_completed", { run_id: 42, stage_name: "extractor", status: "ok" });
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.runs.stages(42) });
+  });
+
   it("invalidates the users.me query when a user_updated event arrives", () => {
     const queryClient = new QueryClient();
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");

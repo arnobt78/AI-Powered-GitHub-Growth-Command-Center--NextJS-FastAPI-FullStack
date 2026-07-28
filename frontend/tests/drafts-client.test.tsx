@@ -8,7 +8,7 @@ import * as useReposModule from "@/hooks/use-repos";
 // No pre-existing sonner mocking convention was found in this codebase's tests
 // (grepped tests/ and tests/setup.ts), so this establishes one: mock the
 // module and assert directly on toast.success/toast.error.
-vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), loading: vi.fn(), dismiss: vi.fn() } }));
 
 const mockToastSuccess = vi.mocked(toast.success);
 const mockToastError = vi.mocked(toast.error);
@@ -22,10 +22,22 @@ const baseDraft = {
 };
 
 function mockHooks(drafts: unknown[]) {
-  vi.spyOn(useDraftsModule, "useDrafts").mockReturnValue({ data: drafts } as ReturnType<typeof useDraftsModule.useDrafts>);
-  vi.spyOn(useDraftsModule, "useReviewDraft").mockReturnValue({ mutate: vi.fn(), isPending: false } as unknown as ReturnType<typeof useDraftsModule.useReviewDraft>);
-  vi.spyOn(useDraftsModule, "useTriggerContentRun").mockReturnValue({ mutate: vi.fn(), isPending: false } as unknown as ReturnType<typeof useDraftsModule.useTriggerContentRun>);
-  vi.spyOn(useReposModule, "useRepos").mockReturnValue({ data: [{ id: 10, owner: "octocat", name: "hello-world" }] } as unknown as ReturnType<typeof useReposModule.useRepos>);
+  vi.spyOn(useDraftsModule, "useDrafts").mockReturnValue({
+    data: drafts,
+    isPending: false,
+    isError: false,
+  } as ReturnType<typeof useDraftsModule.useDrafts>);
+  vi.spyOn(useDraftsModule, "useReviewDraft").mockReturnValue({
+    mutate: vi.fn(),
+    isPending: false,
+  } as unknown as ReturnType<typeof useDraftsModule.useReviewDraft>);
+  vi.spyOn(useDraftsModule, "useTriggerContentRun").mockReturnValue({
+    mutate: vi.fn(),
+    isPending: false,
+  } as unknown as ReturnType<typeof useDraftsModule.useTriggerContentRun>);
+  vi.spyOn(useReposModule, "useRepos").mockReturnValue({
+    data: [{ id: 10, owner: "octocat", name: "hello-world" }],
+  } as unknown as ReturnType<typeof useReposModule.useRepos>);
 }
 
 function mockHooksWithReview(drafts: unknown[], mutate: ReturnType<typeof vi.fn>) {
@@ -73,12 +85,12 @@ describe("DraftsClient approve toast behavior", () => {
     expect(mockToastError).toHaveBeenCalledWith(expect.stringContaining("Could not post"), { description: "GitHub API unavailable" });
   });
 
-  it("shows no posted/failed toast for a non-posting kind like readme_suggestion", () => {
+  it("shows a success toast when approving a non-posting kind like readme_suggestion", () => {
     const mutate = vi.fn((_vars, opts) => opts?.onSuccess?.({ id: 1, status: "approved", error_message: null }));
     mockHooksWithReview([{ ...baseDraft, kind: "readme_suggestion", target: "readme", content: { current: null, suggested: "# New", reason: null } }], mutate);
     render(<DraftsClient />);
     fireEvent.click(screen.getAllByRole("button", { name: /approve/i })[0]);
-    expect(mockToastSuccess).not.toHaveBeenCalled();
+    expect(mockToastSuccess).toHaveBeenCalledWith(expect.stringMatching(/approved/i), expect.anything());
     expect(mockToastError).not.toHaveBeenCalled();
   });
 });

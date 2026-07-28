@@ -1,25 +1,19 @@
 /**
- * Root layout — persistent shell across navigations (nav, theme, providers).
+ * Root layout — providers + AppShell chrome on every page (incl. sign-in).
  *
- * Educational walkthrough
- * -----------------------
- * Layout stays mounted when moving between pages → instant chrome.
- * Providers (session, React Query, SSE live events, theme) wrap all pages once.
- * No `loading.tsx` — feature pages skeleton data slots only, not this shell.
- * SEO / Open Graph fields live in `lib/site-metadata.ts` (imported below).
+ * WHY shell on sign-in: Product Owner wants consistent sidebar/header everywhere;
+ * unauthenticated nav clicks still bounce via proxy to /sign-in.
  */
 
 import type { Metadata } from "next";
 import { SessionProvider } from "next-auth/react";
 import { Toaster } from "@/components/ui/sonner";
-import { GithubIcon } from "@/components/icons/github-icon";
-import { NavSidebar } from "@/components/nav-sidebar";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { AppShell } from "@/components/app-shell";
 import { QueryProvider } from "@/providers/query-provider";
 import { LiveEventsProvider } from "@/providers/live-events-provider";
 import { ThemeProvider } from "@/providers/theme-provider";
 import { geistSans, geistMono } from "@/lib/fonts";
-import { SITE_TITLE_SHORT, siteMetadata } from "@/lib/site-metadata";
+import { siteMetadata } from "@/lib/site-metadata";
 import "./globals.css";
 
 export const metadata: Metadata = siteMetadata;
@@ -30,29 +24,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       lang="en"
       suppressHydrationWarning
       data-scroll-behavior="smooth"
-      // Applying next/font/local's .variable classes here (not next/font/google)
-      // is what makes the preload/self-hosting actually take effect app-wide —
-      // globals.css's --font-sans/--font-mono just reference these variable names.
       className={`${geistSans.variable} ${geistMono.variable}`}
     >
-      <body>
+      {/* suppressHydrationWarning: extensions (e.g. ColorZilla) inject body attrs. */}
+      <body suppressHydrationWarning className="overflow-x-hidden">
         <SessionProvider>
           <ThemeProvider>
             <QueryProvider>
               <LiveEventsProvider>
-                <div className="flex min-h-screen">
-                  <NavSidebar />
-                  <div className="flex-1">
-                    <header className="flex items-center justify-between border-b px-6 py-3">
-                      <h1 className="flex items-center gap-2 text-base font-semibold">
-                        <GithubIcon className="h-5 w-5" aria-hidden="true" />
-                        {SITE_TITLE_SHORT}
-                      </h1>
-                      <ThemeToggle />
-                    </header>
-                    <main className="p-6">{children}</main>
-                  </div>
-                </div>
+                <AppShell>{children}</AppShell>
                 <Toaster />
               </LiveEventsProvider>
             </QueryProvider>

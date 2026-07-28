@@ -72,11 +72,11 @@ Every endpoint requires `Authorization: Bearer <API_KEY>` except the health chec
 
 ## Why the frontend feels instant
 
-The dashboard's page *shell* — headers, card outlines, buttons, icons — renders immediately on every navigation; only the actual data numbers show a brief loading pulse (no `loading.tsx` anywhere). Each of the 5 pages (Overview, repo detail, recommendations inbox, pipeline runs, settings) is a Next.js Server Component (`page.tsx`, `export const dynamic = "force-dynamic"`) that fetches its data server-side, in parallel via `Promise.all` — never one slow query blocking the whole page — then hands it to a `use client` component through TanStack Query's `HydrationBoundary`.
+The dashboard *shell* (sidebar + header, mobile drawer) mounts from the root layout on every route including `/sign-in`. Page chrome paints immediately; data slots use pulse skeletons (no `loading.tsx`). Server Components prefetch in parallel (`Promise.all` where needed) into TanStack Query's `HydrationBoundary`. Overview SSR seeds the repo list only — per-repo metric cards fill client-side. Shared helpers (`PageHeader`, `QueryState`, inbox cards) keep pending/error/empty consistent.
 
-Every open browser tab also subscribes to the backend's `/events` SSE stream (`hooks/use-live-events.ts`). Any change anywhere — dismissing a recommendation, adding/removing a repo, triggering a run, the daily scheduled run finishing, or a draft getting approved/rejected — invalidates the relevant TanStack Query cache keys and shows up everywhere instantly, current tab and every other open tab, without a page refresh.
+Every open tab keeps **one** `/api/events` SSE (`useLiveEvents`). CRUD, dismissals, run/stage progress, drafts, and demo assets invalidate the right query keys (including `runs.stages(runId)` on `stage_completed`) so current page, other tabs, and back-navigation stay fresh without a full refresh. Long jobs use spinning Sonner `job-toasts` until the matching SSE event. No Redis — cache is TanStack Query + SSE.
 
-The browser never holds the backend's API key: Next.js Route Handlers under `frontend/app/api/**` proxy every backend call server-side, using the same typed `lib/api.ts` client the Server Components use for SSR.
+The browser never holds the backend API key: Route Handlers under `frontend/app/api/**` proxy via `lib/api.ts` (same client SSR uses).
 
 Every data-fetching component also handles the failure path, not just loading/empty/success: a failed query (gated on `isError && !data`, so a background-refetch failure never discards data already on screen) shows an inline error state instead of silently rendering blank, and root-level `error.tsx`/`global-error.tsx`/`not-found.tsx` catch anything that slips past a page's own Server Component prefetch.
 

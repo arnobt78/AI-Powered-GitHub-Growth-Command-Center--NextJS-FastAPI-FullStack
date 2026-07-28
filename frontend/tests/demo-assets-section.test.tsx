@@ -3,14 +3,21 @@ import { describe, expect, it, vi } from "vitest";
 import { DemoAssetsSection } from "@/components/repo-detail/demo-assets-section";
 import * as useDemoAssetsModule from "@/hooks/use-demo-assets";
 
-function mockHooks(assets: unknown[], mutate = vi.fn(), isPending = false) {
-  vi.spyOn(useDemoAssetsModule, "useDemoAssets").mockReturnValue({ data: assets, isPending } as ReturnType<typeof useDemoAssetsModule.useDemoAssets>);
-  vi.spyOn(useDemoAssetsModule, "useTriggerDemoAsset").mockReturnValue({ mutate, isPending: false } as unknown as ReturnType<typeof useDemoAssetsModule.useTriggerDemoAsset>);
+function mockHooks(assets: unknown[] | undefined, mutate = vi.fn(), isPending = false) {
+  vi.spyOn(useDemoAssetsModule, "useDemoAssets").mockReturnValue({
+    data: assets,
+    isPending,
+    isError: false,
+  } as ReturnType<typeof useDemoAssetsModule.useDemoAssets>);
+  vi.spyOn(useDemoAssetsModule, "useTriggerDemoAsset").mockReturnValue({
+    mutate,
+    isPending: false,
+  } as unknown as ReturnType<typeof useDemoAssetsModule.useTriggerDemoAsset>);
 }
 
 describe("DemoAssetsSection", () => {
   it("shows a loading skeleton while the initial fetch is pending", () => {
-    mockHooks([], vi.fn(), true);
+    mockHooks(undefined, vi.fn(), true);
     const { container } = render(<DemoAssetsSection repoId={1} />);
     expect(container.querySelector('[data-slot="skeleton"]')).toBeInTheDocument();
     expect(screen.queryByText(/no demo/i)).not.toBeInTheDocument();

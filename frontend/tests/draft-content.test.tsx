@@ -63,4 +63,18 @@ describe("DraftContent", () => {
     render(<DraftContent kind="future_kind" content={{ anything: 1 }} />);
     expect(screen.getByText('{"anything":1}')).toBeInTheDocument();
   });
+
+  it("strips model reasoning blocks from suggested display text", () => {
+    render(
+      <DraftContent
+        kind="missing_doc_suggestion"
+        content={{
+          suggested: "<think>planning the doc</think>\n# Code of Conduct\nBe kind.",
+          reason: null,
+        }}
+      />,
+    );
+    expect(screen.queryByText(/planning the doc/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Code of Conduct/)).toBeInTheDocument();
+  });
 });

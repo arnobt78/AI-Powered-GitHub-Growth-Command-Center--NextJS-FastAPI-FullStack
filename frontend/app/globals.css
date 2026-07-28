@@ -139,11 +139,50 @@
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground;
-  }
   html {
-    @apply font-sans;
+    @apply font-sans overflow-x-hidden;
+  }
+  /* Primary body copy: gray-700 light / white dark (Product Owner preference).
+     Atmosphere: soft top→bottom wash + sparse corner/edge grid dots (masked,
+     not a full-screen dense grid). */
+  body {
+    @apply relative min-h-screen overflow-x-hidden bg-background text-gray-700 dark:text-white;
+    background-image:
+      linear-gradient(
+        180deg,
+        color-mix(in oklch, var(--primary) 6%, transparent) 0%,
+        transparent 42%,
+        color-mix(in oklch, var(--primary) 4%, transparent) 100%
+      );
+  }
+  body::before {
+    content: "";
+    pointer-events: none;
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    opacity: 0.45;
+    background-image: radial-gradient(
+      color-mix(in oklch, var(--foreground) 18%, transparent) 1px,
+      transparent 1px
+    );
+    background-size: 22px 22px;
+    /* Dots only near edges/corners — center stays clean. */
+    mask-image: radial-gradient(
+      ellipse 70% 60% at 50% 45%,
+      transparent 55%,
+      black 100%
+    );
+    -webkit-mask-image: radial-gradient(
+      ellipse 70% 60% at 50% 45%,
+      transparent 55%,
+      black 100%
+    );
+  }
+  /* Keep app chrome/content above the fixed dots layer. */
+  body > * {
+    position: relative;
+    z-index: 1;
   }
 }
 
